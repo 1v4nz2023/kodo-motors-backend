@@ -9,14 +9,16 @@
  */
 const { Router } = require('express');
 const catalogoController = require('../controllers/catalogo.controller');
-const validarId = require('../middlewares/validarId');
+const { idParam } = require('../validators/common');
+const validar = require('../validators/validar');
+const { reglasCatalogo } = require('../validators/catalogo.validators');
 
 const router = Router();
 
 router.get('/', catalogoController.listar);
-router.get('/:id', validarId, catalogoController.obtenerPorId);
-router.post('/', catalogoController.crear);
-router.put('/:id', validarId, catalogoController.actualizar);
-router.delete('/:id', validarId, catalogoController.eliminar);
+router.get('/:id', idParam(), validar, catalogoController.obtenerPorId);
+router.post('/', reglasCatalogo(), validar, catalogoController.crear);
+router.put('/:id', idParam(), reglasCatalogo(), validar, catalogoController.actualizar);
+router.delete('/:id', idParam(), validar, catalogoController.eliminar);
 
 module.exports = router;
