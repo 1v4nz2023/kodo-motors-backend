@@ -11,7 +11,13 @@
     "bd:detener": "docker compose down",
     "bd:reiniciar": "docker compose down -v && docker compose up -d"
   },
-  "keywords": ["kodo-motors", "api-rest", "express", "mysql", "ucal"],
+  "keywords": [
+    "kodo-motors",
+    "api-rest",
+    "express",
+    "mysql",
+    "ucal"
+  ],
   "author": "Equipos E03, u2 y Grupo1-4 · EE2 Fundamentos de Desarrollo Back-End, UCAL",
   "license": "ISC",
   "private": true,
@@ -22,6 +28,7 @@
     "cors": "~2.8.5",
     "dotenv": "~17.4.2",
     "express": "~5.2.1",
+    "express-validator": "^7.3.2",
     "mysql2": "~3.24.6"
   },
   "devDependencies": {
