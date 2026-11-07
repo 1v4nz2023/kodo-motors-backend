@@ -32,9 +32,21 @@ const sedesRepository = require('./src/repositories/sedes.repository');
 const serviciosRepository = require('./src/repositories/servicios.repository');
 const catalogoRepository = require('./src/repositories/catalogo.repository');
 const reservaRepository = require('./src/repositories/reserva.repository');
+const lookupsRepository = require('./src/repositories/lookups.repository');
 const validarId = require('./src/middlewares/validarId');
 const { manejarErrores } = require('./src/middlewares/manejarErrores');
 const { pool } = require('./src/config/db');
+const {
+  AppError,
+  NotFoundError,
+  ConflictError,
+  BadRequestError,
+  ValidationError,
+  UnauthorizedError,
+  ForbiddenError,
+} = require('./src/errors/AppError');
+const trazabilidad = require('./src/middlewares/trazabilidad');
+const { autenticar, autorizar } = require('./src/middlewares/auth');
 
 const resultados = [];
 
@@ -153,6 +165,7 @@ async function ejecutarSuite() {
   const origServicios = { ...serviciosRepository };
   const origCatalogo = { ...catalogoRepository };
   const origReserva = { ...reservaRepository };
+  const origLookups = { ...lookupsRepository };
 
   repuestosRepository.findById = async () => new Repuesto({
     id: 10, codigo: 'TST-001', nombre: 'Filtro Test', modelo_compatible: 'CX-5',
@@ -413,6 +426,156 @@ async function ejecutarSuite() {
     `${res.codigo} ${JSON.stringify(res.cuerpo)}`
   );
 
+  // --- SECCIÓN 8: CAPA DE MANEJO DE ERRORES - SEMANA 10 (SEDES, SERVICIOS Y RESERVAS) ---
+  console.log('\n🛡️ 8. Capa de Manejo de Errores - Semana 10 (Sedes, Servicios y Reservas)...');
+
+  // SEDES
+  sedesRepository.buscarPorId = async () => null;
+  error = await capturarError(() => sedesService.buscarSedePorId(999));
+  registrarPrueba(
+    'CP-31',
+    'Sedes: buscar inexistente lanza NotFoundError (404, NO_ENCONTRADO)',
+    error instanceof NotFoundError && error.estado === 404 && error.tipo === 'NO_ENCONTRADO',
+    'NotFoundError 404 NO_ENCONTRADO',
+    error ? `${error.name} ${error.estado} ${error.tipo}` : 'No lanzó error'
+  );
+
+  sedesRepository.buscarPorNombre = async () => ({ id: 1, activa: true });
+  error = await capturarError(() => sedesService.crearSede({
+    nombre: 'Sede Existente', distrito: 'Surco', direccion: 'Av. Primavera 100',
+    telefono: '014445566', hora_apertura: '08:00', hora_cierre: '18:00'
+  }));
+  registrarPrueba(
+    'CP-32',
+    'Sedes: conflicto por nombre duplicado lanza ConflictError (409, CONFLICTO)',
+    error instanceof ConflictError && error.estado === 409 && error.tipo === 'CONFLICTO',
+    'ConflictError 409 CONFLICTO',
+    error ? `${error.name} ${error.estado} ${error.tipo}` : 'No lanzó error'
+  );
+
+  error = await capturarError(() => sedesService.actualizarSede(1, {}));
+  registrarPrueba(
+    'CP-33',
+    'Sedes: actualizar sin campos lanza BadRequestError (400, SOLICITUD_INVALIDA)',
+    error instanceof BadRequestError && error.estado === 400 && error.tipo === 'SOLICITUD_INVALIDA',
+    'BadRequestError 400 SOLICITUD_INVALIDA',
+    error ? `${error.name} ${error.estado} ${error.tipo}` : 'No lanzó error'
+  );
+
+  // SERVICIOS
+  serviciosRepository.buscarPorId = async () => null;
+  error = await capturarError(() => serviciosService.buscarServicioPorId(999));
+  registrarPrueba(
+    'CP-34',
+    'Servicios: buscar inexistente lanza NotFoundError (404, NO_ENCONTRADO)',
+    error instanceof NotFoundError && error.estado === 404 && error.tipo === 'NO_ENCONTRADO',
+    'NotFoundError 404 NO_ENCONTRADO',
+    error ? `${error.name} ${error.estado} ${error.tipo}` : 'No lanzó error'
+  );
+
+  serviciosRepository.buscarPorNombre = async () => ({ id: 1, activo: true });
+  error = await capturarError(() => serviciosService.crearServicio({
+    nombre: 'Alineación', categoria: 'mantenimiento', precio: 120, duracion_min: 45
+  }));
+  registrarPrueba(
+    'CP-35',
+    'Servicios: conflicto por nombre repetido lanza ConflictError (409, CONFLICTO)',
+    error instanceof ConflictError && error.estado === 409 && error.tipo === 'CONFLICTO',
+    'ConflictError 409 CONFLICTO',
+    error ? `${error.name} ${error.estado} ${error.tipo}` : 'No lanzó error'
+  );
+
+  error = await capturarError(() => servicioModelo.validarServicio({
+    nombre: 'Test', categoria: 'categoria_invalida', precio: -10, duracion_min: 0
+  }));
+  registrarPrueba(
+    'CP-36',
+    'Servicios: datos inválidos lanzan ValidationError (400, VALIDACION) con lista de errores',
+    error instanceof ValidationError && error.estado === 400 && error.tipo === 'VALIDACION' && Array.isArray(error.detalle),
+    'ValidationError 400 VALIDACION con detalle[]',
+    error ? `${error.name} ${error.estado} ${error.tipo} ${JSON.stringify(error.detalle)}` : 'No lanzó error'
+  );
+
+  // RESERVAS
+  reservaRepository.obtenerPorId = async () => null;
+  error = await capturarError(() => reservaService.obtenerPorId(999));
+  registrarPrueba(
+    'CP-37',
+    'Reservas: buscar inexistente lanza NotFoundError (404, NO_ENCONTRADO)',
+    error instanceof NotFoundError && error.estado === 404 && error.tipo === 'NO_ENCONTRADO',
+    'NotFoundError 404 NO_ENCONTRADO',
+    error ? `${error.name} ${error.estado} ${error.tipo}` : 'No lanzó error'
+  );
+
+  lookupsRepository.existeSede = async () => true;
+  lookupsRepository.existeServicio = async () => true;
+  lookupsRepository.existeVehiculo = async () => true;
+  reservaRepository.existeChoque = async () => true;
+  error = await capturarError(() => reservaService.crear({
+    fecha: '2026-12-01', hora: '10:00', sede_id: 1, servicio_id: 1, vehiculo_id: 1
+  }));
+  registrarPrueba(
+    'CP-38',
+    'Reservas: choque de horario en misma sede, fecha y hora lanza ConflictError (409, CONFLICTO)',
+    error instanceof ConflictError && error.estado === 409 && error.tipo === 'CONFLICTO',
+    'ConflictError 409 CONFLICTO',
+    error ? `${error.name} ${error.estado} ${error.tipo}` : 'No lanzó error'
+  );
+
+  error = await capturarError(() => reservaService.crear({}));
+  registrarPrueba(
+    'CP-39',
+    'Reservas: body vacío lanza ValidationError (400, VALIDACION) con lista de errores',
+    error instanceof ValidationError && error.estado === 400 && error.tipo === 'VALIDACION' && error.detalle.length >= 5,
+    'ValidationError 400 VALIDACION con al menos 5 campos faltantes',
+    error ? `${error.name} ${error.estado} ${error.tipo} ${JSON.stringify(error.detalle)}` : 'No lanzó error'
+  );
+
+  // TRAZABILIDAD Y FORMATO DE ERROR
+  const reqFalsa = { header: () => null, headers: {} };
+  const resFalsaTrazabilidad = {
+    cabeceras: {},
+    setHeader(nombre, valor) { this.cabeceras[nombre] = valor; }
+  };
+  trazabilidad(reqFalsa, resFalsaTrazabilidad, () => {});
+  registrarPrueba(
+    'CP-40',
+    'Trazabilidad: asigna req.idTraza (8 caracteres) y cabecera X-Request-Id',
+    typeof reqFalsa.idTraza === 'string' && reqFalsa.idTraza.length === 8 && resFalsaTrazabilidad.cabeceras['X-Request-Id'] === reqFalsa.idTraza,
+    'idTraza de 8 caracteres y cabecera X-Request-Id coincidente',
+    `idTraza=${reqFalsa.idTraza}, header=${resFalsaTrazabilidad.cabeceras['X-Request-Id']}`
+  );
+
+  res = respuestaFalsa();
+  const reqConTraza = { idTraza: 'abc12345', method: 'GET', originalUrl: '/api/reservas/999' };
+  manejarErrores(new NotFoundError('La reserva con id 999 no existe'), reqConTraza, res, () => {});
+  const cumpleContrato = res.codigo === 404 &&
+    res.cuerpo.estado === 404 &&
+    res.cuerpo.tipo === 'NO_ENCONTRADO' &&
+    res.cuerpo.mensaje === 'La reserva con id 999 no existe' &&
+    res.cuerpo.idTraza === 'abc12345' &&
+    res.cuerpo.ruta === 'GET /api/reservas/999';
+  registrarPrueba(
+    'CP-41',
+    'Contrato de error: respuesta estándar con { estado, tipo, mensaje, idTraza, ruta }',
+    cumpleContrato,
+    'Respuesta completa del contrato de error',
+    JSON.stringify(res.cuerpo)
+  );
+
+  let errAuth = null;
+  autenticar({ header: () => null }, {}, (err) => { errAuth = err; });
+  let errRol = null;
+  autorizar('admin')({ header: () => 'recepcion' }, {}, (err) => { errRol = err; });
+  registrarPrueba(
+    'CP-42',
+    'Autenticación y Autorización (401 y 403): UnauthorizedError y ForbiddenError',
+    errAuth instanceof UnauthorizedError && errAuth.estado === 401 && errAuth.tipo === 'NO_AUTENTICADO' &&
+    errRol instanceof ForbiddenError && errRol.estado === 403 && errRol.tipo === 'SIN_PERMISO',
+    '401 NO_AUTENTICADO y 403 SIN_PERMISO',
+    `auth=${errAuth && errAuth.estado} (${errAuth && errAuth.tipo}), rol=${errRol && errRol.estado} (${errRol && errRol.tipo})`
+  );
+
   // Restaurar repositorios originales
   Object.assign(repuestosRepository, origRep);
   Object.assign(encuestasRepository, origEnc);
@@ -420,6 +583,7 @@ async function ejecutarSuite() {
   Object.assign(serviciosRepository, origServicios);
   Object.assign(catalogoRepository, origCatalogo);
   Object.assign(reservaRepository, origReserva);
+  Object.assign(lookupsRepository, origLookups);
 
   // Resumen final
   console.log('\n===============================================================');

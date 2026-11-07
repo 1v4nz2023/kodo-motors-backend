@@ -1,11 +1,10 @@
-// Middleware que cierra la cadena de reglas: si hay errores responde 400 y el controlador NUNCA se ejecuta.
+// Middleware de validación con express-validator (Semana 10, Slide 27)
+// Delega al handler central pasando una instancia de ValidationError
 const { validationResult } = require('express-validator');
+const { ValidationError } = require('../errors/AppError');
 
 module.exports = (req, res, next) => {
-  const resultado = validationResult(req).formatWith((e) => ({ campo: e.path, mensaje: e.msg }));
-  if (resultado.isEmpty()) return next();
-  return res.status(400).json({
-    mensaje: 'Datos inválidos',
-    errores: resultado.array({ onlyFirstError: true }), // un solo mensaje por campo
-  });
+  const r = validationResult(req).formatWith((e) => ({ campo: e.path, mensaje: e.msg }));
+  if (r.isEmpty()) return next();
+  return next(new ValidationError(r.array({ onlyFirstError: true })));
 };
