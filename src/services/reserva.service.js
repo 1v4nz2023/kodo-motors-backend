@@ -1,7 +1,8 @@
 /**
  * Servicio de Reservas: reglas de negocio según Semana 10 (Slides 23, 24, 34).
- * Valida los datos, verifica que existan sede/servicio/vehículo
- * y que no haya otra reserva en el mismo horario. Luego llama al repositorio.
+ * Valida los datos, verifica que existan sede/servicio/vehículo, que la cita
+ * entre en la agenda de la sede y que no haya otra reserva en el mismo horario.
+ * Luego llama al repositorio.
  */
 const {
   NotFoundError,
@@ -12,6 +13,10 @@ const {
 const modelo = require('../models/reserva.model');
 const repo = require('../repositories/reserva.repository');
 const lookups = require('../repositories/lookups.repository');
+const repoSedes = require('../repositories/sedes.repository');
+const repoServicios = require('../repositories/servicios.repository');
+
+const DIAS_MAXIMOS_ANTICIPACION = 30;
 
 /** Verifica que los IDs relacionados existan en sus tablas (foreign keys). */
 async function verificarRelaciones(datos) {
@@ -26,6 +31,63 @@ async function verificarRelaciones(datos) {
   }
 }
 
+function minutosDelDia(hora) {
+  const [horas, minutos] = hora.split(':').map(Number);
+  return horas * 60 + minutos;
+}
+
+/** La cita debe ser futura, dentro de la anticipación máxima y en horario de la sede. */
+async function verificarAgenda({ fecha, hora, sede_id, servicio_id }) {
+  const ahora = new Date();
+  const inicio = new Date(`${fecha}T${hora}:00`);
+  if (inicio <= ahora) {
+    throw new BadRequestError('La cita no puede ser en una fecha u hora pasada');
+  }
+
+  const limite = new Date(ahora);
+  limite.setDate(limite.getDate() + DIAS_MAXIMOS_ANTICIPACION);
+  limite.setHours(23, 59, 59, 999);
+  if (inicio > limite) {
+    throw new BadRequestError(`La cita se puede agendar con máximo ${DIAS_MAXIMOS_ANTICIPACION} días de anticipación`);
+  }
+
+  const sede = await repoSedes.buscarPorId(sede_id);
+  if (inicio.getDay() === 0 && !sede.atiende_domingo) {
+    throw new BadRequestError(`La sede ${sede.nombre} no atiende los domingos`);
+  }
+
+  const servicio = await repoServicios.buscarPorId(servicio_id);
+  const minutoInicio = minutosDelDia(hora);
+  if (minutoInicio < minutosDelDia(sede.hora_apertura)
+    || minutoInicio + servicio.duracion_min > minutosDelDia(sede.hora_cierre)) {
+    const apertura = sede.hora_apertura.slice(0, 5);
+    const cierre = sede.hora_cierre.slice(0, 5);
+    throw new BadRequestError(
+      `El servicio dura ${servicio.duracion_min} minutos y debe empezar y terminar dentro del horario de la sede (${apertura} a ${cierre})`,
+    );
+  }
+}
+
+/** Ni la sede ni el vehículo pueden tener otra reserva vigente en ese horario. */
+async function verificarChoques(cita, idExcluir = null) {
+  if (await repo.existeChoque(cita, idExcluir)) {
+    throw new ConflictError('Ya existe otra reserva en esa sede, fecha y hora');
+  }
+  if (await repo.existeChoqueVehiculo(cita, idExcluir)) {
+    throw new ConflictError('El vehículo ya tiene otra reserva en esa fecha y hora');
+  }
+}
+
+function verificarTransicion(estadoActual, estadoNuevo) {
+  const permitidos = modelo.TRANSICIONES[estadoActual];
+  if (permitidos.length === 0) {
+    throw new ConflictError(`La reserva está ${estadoActual} y ya no se puede modificar`);
+  }
+  if (estadoNuevo !== undefined && estadoNuevo !== estadoActual && !permitidos.includes(estadoNuevo)) {
+    throw new ConflictError(`Una reserva ${estadoActual} solo puede pasar a: ${permitidos.join(', ')}`);
+  }
+}
+
 async function listar(filtros) {
   return repo.listar(filtros);
 }
@@ -37,21 +99,22 @@ async function obtenerPorId(id) {
 }
 
 async function crear(body) {
+  modelo.revisarCampos(body);
+
   const errores = modelo.validar(body);
   if (errores.length) throw new ValidationError(errores, 'Datos de reserva inválidos');
 
   const datos = modelo.limpiar(body);
   await verificarRelaciones(datos);
-
-  if (await repo.existeChoque(datos)) {
-    throw new ConflictError('Ya existe una reserva en esa sede, fecha y hora');
-  }
+  await verificarAgenda(datos);
+  await verificarChoques(datos);
 
   return repo.crear(datos);
 }
 
 async function actualizar(id, body) {
   const actual = await obtenerPorId(id); // lanza NotFoundError si no existe
+  modelo.revisarCampos(body);
 
   const errores = modelo.validar(body, { parcial: true });
   if (errores.length) throw new ValidationError(errores, 'Datos de reserva inválidos');
@@ -61,16 +124,28 @@ async function actualizar(id, body) {
     throw new BadRequestError('No se envió ningún campo para actualizar');
   }
 
-  await verificarRelaciones(datos);
+  verificarTransicion(actual.estado, datos.estado);
 
-  // Para el choque se usan los valores nuevos o, si no cambian, los actuales
-  const horario = {
-    sede_id: datos.sede_id ?? actual.sede.id,
+  // Para las reglas se usan los valores nuevos o, si no cambian, los actuales
+  const cita = {
     fecha: datos.fecha ?? actual.fecha,
     hora: datos.hora ?? actual.hora,
+    sede_id: datos.sede_id ?? actual.sede.id,
+    servicio_id: datos.servicio_id ?? actual.servicio.id,
+    vehiculo_id: datos.vehiculo_id ?? actual.vehiculo.id,
   };
-  if (await repo.existeChoque(horario, id)) {
-    throw new ConflictError('Ya existe otra reserva en esa sede, fecha y hora');
+
+  // Una cita ya pasada debe poder marcarse como atendida: la agenda solo se revisa si se mueve
+  const cambiaAgenda = cita.fecha !== actual.fecha
+    || cita.hora !== actual.hora
+    || cita.sede_id !== actual.sede.id
+    || cita.servicio_id !== actual.servicio.id;
+
+  await verificarRelaciones(cambiaAgenda ? cita : datos);
+  if (cambiaAgenda) await verificarAgenda(cita);
+
+  if (modelo.ESTADOS_VIGENTES.includes(datos.estado ?? actual.estado)) {
+    await verificarChoques(cita, id);
   }
 
   return repo.actualizar(id, datos);

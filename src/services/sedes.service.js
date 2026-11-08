@@ -1,12 +1,14 @@
 // Servicio de sedes: reglas de negocio según Semana 10 (Slides 23, 24, 34)
 // Lanza errores tipados (NotFoundError, ConflictError, BadRequestError)
 const repositorio = require('../repositories/sedes.repository');
+const repositorioReservas = require('../repositories/reserva.repository');
 const modelo = require('../models/sede.model');
 const {
   NotFoundError,
   ConflictError,
   BadRequestError,
 } = require('../errors/AppError');
+const { hoyISO } = require('../validators/common');
 
 async function listarSedes(filtros = {}) {
   const filtrosLimpios = modelo.validarFiltros(filtros);
@@ -57,6 +59,11 @@ async function actualizarSede(id, cambios) {
 }
 
 async function eliminarSede(id) {
+  const citasPendientes = await repositorioReservas.contarCitasPendientesDeSede(id, hoyISO());
+  if (citasPendientes > 0) {
+    throw new ConflictError(`No se puede dar de baja la sede: tiene citas generadas pendientes (${citasPendientes})`);
+  }
+
   const eliminada = await repositorio.eliminar(id);
   if (!eliminada) {
     throw new NotFoundError(`No existe una sede con id ${id}`);

@@ -1,12 +1,14 @@
 // Servicio de servicios: reglas de negocio según Semana 10 (Slides 23, 24, 34)
 // Lanza errores tipados (NotFoundError, ConflictError, BadRequestError)
 const repositorio = require('../repositories/servicios.repository');
+const repositorioReservas = require('../repositories/reserva.repository');
 const modelo = require('../models/servicio.model');
 const {
   NotFoundError,
   ConflictError,
   BadRequestError,
 } = require('../errors/AppError');
+const { hoyISO } = require('../validators/common');
 
 async function listarServicios(filtros = {}) {
   const filtrosLimpios = modelo.validarFiltros(filtros);
@@ -57,6 +59,11 @@ async function actualizarServicio(id, cambios) {
 }
 
 async function eliminarServicio(id) {
+  const citasPendientes = await repositorioReservas.contarCitasPendientesDeServicio(id, hoyISO());
+  if (citasPendientes > 0) {
+    throw new ConflictError(`No se puede dar de baja el servicio: tiene citas generadas pendientes (${citasPendientes})`);
+  }
+
   const eliminado = await repositorio.eliminar(id);
   if (!eliminado) {
     throw new NotFoundError(`No existe un servicio con id ${id}`);

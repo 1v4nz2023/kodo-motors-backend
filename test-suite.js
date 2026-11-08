@@ -9,6 +9,8 @@
  * 5. Borrado lógico en los seis recursos (404 si ya estaba dado de baja)
  * 6. Validaciones de los modelos (la bandera activo/activa no se acepta en el body)
  * 7. Contrato común: validarId y manejarErrores
+ * 8. Validadores de sedes, servicios y reservas
+ * 9. Reglas de negocio de reservas y bajas con citas pendientes
  */
 
 const fs = require('fs');
@@ -47,6 +49,14 @@ const {
 } = require('./src/errors/AppError');
 const trazabilidad = require('./src/middlewares/trazabilidad');
 const { autenticar, autorizar } = require('./src/middlewares/auth');
+const { validationResult } = require('express-validator');
+const { reglasSede } = require('./src/validators/sedes.validators');
+const { reglasServicio } = require('./src/validators/servicios.validators');
+const {
+  reglasCrearReserva,
+  reglasActualizarReserva,
+  reglasFiltrosReserva,
+} = require('./src/validators/reservas.validators');
 
 const resultados = [];
 
@@ -72,6 +82,23 @@ async function capturarError(fn) {
 
 function leer(rutaRelativa) {
   return fs.readFileSync(path.join(__dirname, rutaRelativa), 'utf8');
+}
+
+// Ejecuta las reglas de express-validator y devuelve los campos con error
+async function camposConError(reglas, peticion) {
+  const req = { body: {}, query: {}, params: {}, ...peticion };
+  for (const regla of reglas) await regla.run(req);
+  return [...new Set(validationResult(req).array().map((e) => e.path))];
+}
+
+// Fecha AAAA-MM-DD a n días de hoy, opcionalmente movida al siguiente día de la semana indicado
+function fechaEnDias(dias, diaSemana = null) {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() + dias);
+  while (diaSemana !== null && fecha.getDay() !== diaSemana) fecha.setDate(fecha.getDate() + 1);
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getDate()).padStart(2, '0');
+  return `${fecha.getFullYear()}-${mes}-${dia}`;
 }
 
 // Respuesta falsa de Express para probar el manejador de errores
@@ -283,6 +310,8 @@ async function ejecutarSuite() {
   serviciosRepository.eliminar = async () => false;
   catalogoRepository.remove = async () => false;
   reservaRepository.eliminar = async () => false;
+  reservaRepository.contarCitasPendientesDeSede = async () => 0;
+  reservaRepository.contarCitasPendientesDeServicio = async () => 0;
 
   const recursos = [
     ['CP-14', 'una sede', () => sedesService.eliminarSede(5)],
@@ -426,14 +455,229 @@ async function ejecutarSuite() {
     `${res.codigo} ${JSON.stringify(res.cuerpo)}`
   );
 
-  // --- SECCIÓN 8: CAPA DE MANEJO DE ERRORES - SEMANA 10 (SEDES, SERVICIOS Y RESERVAS) ---
-  console.log('\n🛡️ 8. Capa de Manejo de Errores - Semana 10 (Sedes, Servicios y Reservas)...');
+  // --- SECCIÓN 8: VALIDADORES ---
+  console.log('\n🛡️ 8. Validadores de sedes, servicios y reservas...');
+
+  const sedeValida = {
+    nombre: 'Kodo San Isidro', distrito: 'San Isidro', direccion: 'Av. Javier Prado Este 1234, Of. 2',
+    telefono: '014445566', hora_apertura: '08:00', hora_cierre: '18:00', atiende_domingo: false,
+  };
+  const sinErroresSede = await camposConError(reglasSede(), { body: sedeValida });
+  const erroresSede = await camposConError(reglasSede(), {
+    body: {
+      ...sedeValida, nombre: '<script>alert(1)</script>', distrito: 'Lima 1', direccion: ['Av. Larco 100'],
+      telefono: '123456789', hora_apertura: '8:00', atiende_domingo: 'quizá',
+    },
+  });
+  registrarPrueba(
+    'CP-31',
+    'Sedes: acepta datos reales y rechaza HTML, arreglos y formatos inválidos',
+    sinErroresSede.length === 0 && erroresSede.length === 6,
+    '0 errores con datos válidos y 6 campos rechazados',
+    `válidos=${JSON.stringify(sinErroresSede)}, inválidos=${JSON.stringify(erroresSede)}`
+  );
+
+  const parcialSede = await camposConError(reglasSede(true), { body: { direccion: 'Av. Larco 200' } });
+  const reqEspacios = { body: { ...sedeValida, nombre: '  Kodo   Miraflores ' } };
+  await camposConError(reglasSede(), reqEspacios);
+  const sedeConActiva = await camposConError(reglasSede(true), { body: { activa: true } });
+  registrarPrueba(
+    'CP-32',
+    'Sedes: PUT parcial, espacios normalizados y activa rechazada',
+    parcialSede.length === 0 && reqEspacios.body.nombre === 'Kodo Miraflores' && sedeConActiva.includes('activa'),
+    'PUT parcial válido, nombre limpio y activa con error',
+    `parcial=${JSON.stringify(parcialSede)}, nombre="${reqEspacios.body.nombre}", activa=${JSON.stringify(sedeConActiva)}`
+  );
+
+  const servicioValido = {
+    nombre: 'Alineamiento 3D', categoria: 'neumaticos', descripcion: 'Incluye balanceo', precio: 99.9, duracion_min: 45,
+  };
+  const sinErroresServicio = await camposConError(reglasServicio(), { body: servicioValido });
+  const erroresServicio = await camposConError(reglasServicio(), {
+    body: {
+      nombre: 'AB', categoria: 'otra', descripcion: '<b>oferta</b>', precio: 10.999, duracion_min: 10,
+    },
+  });
+  const precioArreglo = await camposConError(reglasServicio(true), { body: { precio: [100] } });
+  registrarPrueba(
+    'CP-33',
+    'Servicios: valida texto, categoría, precio con 2 decimales y duración',
+    sinErroresServicio.length === 0 && erroresServicio.length === 5 && precioArreglo.includes('precio'),
+    '0 errores con datos válidos, 5 campos rechazados y arreglo en precio rechazado',
+    `válidos=${JSON.stringify(sinErroresServicio)}, inválidos=${JSON.stringify(erroresServicio)}, arreglo=${JSON.stringify(precioArreglo)}`
+  );
+
+  const reservaValida = {
+    fecha: '2026-12-21', hora: '09:30', sede_id: 1, servicio_id: 1, vehiculo_id: 1, observacion: 'Primera visita',
+  };
+  const sinErroresReserva = await camposConError(reglasCrearReserva(), { body: reservaValida });
+  const erroresReserva = await camposConError(reglasCrearReserva(), {
+    body: {
+      fecha: '2026-02-30', hora: '09:15', sede_id: true, servicio_id: [1], vehiculo_id: 0,
+      estado: 'atendida', observacion: '<img src=x>',
+    },
+  });
+  registrarPrueba(
+    'CP-34',
+    'Reservas: rechaza fecha imposible, hora fuera de intervalo, ids no enteros y estado inicial',
+    sinErroresReserva.length === 0 && erroresReserva.length === 7,
+    '0 errores con datos válidos y 7 campos rechazados',
+    `válidos=${JSON.stringify(sinErroresReserva)}, inválidos=${JSON.stringify(erroresReserva)}`
+  );
+
+  const parcialReserva = await camposConError(reglasActualizarReserva(), { body: { observacion: null } });
+  const estadoReserva = await camposConError(reglasActualizarReserva(), { body: { estado: 'perdida' } });
+  registrarPrueba(
+    'CP-35',
+    'Reservas: PUT parcial acepta observacion null y rechaza un estado inexistente',
+    parcialReserva.length === 0 && estadoReserva.includes('estado'),
+    'Sin errores en el parcial y error en estado',
+    `parcial=${JSON.stringify(parcialReserva)}, estado=${JSON.stringify(estadoReserva)}`
+  );
+
+  const filtrosValidos = await camposConError(reglasFiltrosReserva(), {
+    query: { estado: 'pendiente', fecha: '2026-11-20', sede_id: '1' },
+  });
+  const filtrosInvalidos = await camposConError(reglasFiltrosReserva(), {
+    query: { estado: ['pendiente', 'atendida'], fecha: 'ayer', sede_id: 'abc' },
+  });
+  registrarPrueba(
+    'CP-36',
+    'Reservas: filtros inválidos o repetidos se rechazan',
+    filtrosValidos.length === 0 && filtrosInvalidos.length === 3,
+    '0 errores con filtros válidos y 3 rechazados',
+    `válidos=${JSON.stringify(filtrosValidos)}, inválidos=${JSON.stringify(filtrosInvalidos)}`
+  );
+
+  // --- SECCIÓN 9: REGLAS DE RESERVAS Y BAJAS ---
+  console.log('\n📅 9. Reglas de negocio de reservas y bajas con citas pendientes...');
+
+  lookupsRepository.existeSede = async () => true;
+  lookupsRepository.existeServicio = async () => true;
+  lookupsRepository.existeVehiculo = async () => true;
+  sedesRepository.buscarPorId = async () => ({
+    id: 1, nombre: 'Kodo Surquillo', hora_apertura: '08:00:00', hora_cierre: '18:00:00', atiende_domingo: false,
+  });
+  serviciosRepository.buscarPorId = async () => ({ id: 1, duracion_min: 120 });
+  reservaRepository.existeChoque = async () => false;
+  reservaRepository.existeChoqueVehiculo = async () => false;
+  reservaRepository.crear = async (datos) => datos;
+  reservaRepository.actualizar = async (id, datos) => ({ id, ...datos });
+
+  const lunes = fechaEnDias(1, 1);
+  const cita = { hora: '09:30', sede_id: 1, servicio_id: 1, vehiculo_id: 1 };
+
+  const casosAgenda = [
+    ['CP-37', 'Cita en el pasado', { ...cita, fecha: '2020-01-06' }, 'pasada'],
+    ['CP-38', 'Cita a más de 30 días', { ...cita, fecha: fechaEnDias(31) }, '30 días'],
+    ['CP-39', 'Cita en domingo en sede que no atiende', { ...cita, fecha: fechaEnDias(1, 0) }, 'domingos'],
+    ['CP-40', 'Cita antes de la apertura', { ...cita, fecha: lunes, hora: '07:30' }, 'horario'],
+    ['CP-41', 'Servicio que termina después del cierre', { ...cita, fecha: lunes, hora: '16:30' }, 'horario'],
+  ];
+  for (const [codigo, descripcion, datos, texto] of casosAgenda) {
+    error = await capturarError(() => reservaService.crear(datos));
+    registrarPrueba(
+      codigo,
+      `${descripcion} → 400`,
+      error instanceof HttpError && error.status === 400 && error.message.includes(texto),
+      `HTTP 400 con "${texto}"`,
+      error ? `HTTP ${error.status}: ${error.message}` : 'Permitió crear'
+    );
+  }
+
+  const creada = await reservaService.crear({ ...cita, fecha: lunes, hora: '16:00' });
+  registrarPrueba(
+    'CP-42',
+    'Servicio que termina justo al cierre se acepta',
+    creada && creada.hora === '16:00',
+    'Reserva creada',
+    JSON.stringify(creada)
+  );
+
+  error = await capturarError(() => reservaService.crear({ ...cita, fecha: lunes, placa: 'ABC123' }));
+  registrarPrueba(
+    'CP-43',
+    'Reservas: un campo desconocido se rechaza',
+    error instanceof HttpError && error.status === 400 && error.errores.some((e) => e.includes('placa')),
+    'HTTP 400 con "placa no es un campo permitido"',
+    error ? `HTTP ${error.status}: ${JSON.stringify(error.errores)}` : 'Lo aceptó'
+  );
+
+  reservaRepository.existeChoqueVehiculo = async () => true;
+  error = await capturarError(() => reservaService.crear({ ...cita, fecha: lunes }));
+  reservaRepository.existeChoqueVehiculo = async () => false;
+  registrarPrueba(
+    'CP-44',
+    'Mismo vehículo en la misma fecha y hora → 409',
+    error instanceof HttpError && error.status === 409 && error.message.includes('vehículo'),
+    'HTTP 409 por el vehículo',
+    error ? `HTTP ${error.status}: ${error.message}` : 'Permitió crear'
+  );
+
+  const reservaGuardada = (estado, fecha = lunes) => ({
+    id: 8, fecha, hora: '09:30', estado, sede: { id: 1 }, servicio: { id: 1 }, vehiculo: { id: 1 },
+  });
+
+  reservaRepository.obtenerPorId = async () => reservaGuardada('pendiente');
+  error = await capturarError(() => reservaService.actualizar(8, { estado: 'atendida' }));
+  registrarPrueba(
+    'CP-45',
+    'Una reserva pendiente no pasa directo a atendida → 409',
+    error instanceof HttpError && error.status === 409 && error.message.includes('confirmada'),
+    'HTTP 409 con los estados permitidos',
+    error ? `HTTP ${error.status}: ${error.message}` : 'Permitió cambiar'
+  );
+
+  reservaRepository.obtenerPorId = async () => reservaGuardada('cancelada');
+  error = await capturarError(() => reservaService.actualizar(8, { observacion: 'Reabrir' }));
+  registrarPrueba(
+    'CP-46',
+    'Una reserva cancelada ya no se puede editar → 409',
+    error instanceof HttpError && error.status === 409 && error.message.includes('ya no se puede modificar'),
+    'HTTP 409',
+    error ? `HTTP ${error.status}: ${error.message}` : 'Permitió editar'
+  );
+
+  reservaRepository.obtenerPorId = async () => reservaGuardada('confirmada', '2026-10-20');
+  const atendida = await reservaService.actualizar(8, { estado: 'atendida' });
+  registrarPrueba(
+    'CP-47',
+    'Una cita pasada confirmada se puede marcar como atendida',
+    atendida && atendida.estado === 'atendida',
+    'Reserva actualizada',
+    JSON.stringify(atendida)
+  );
+
+  reservaRepository.contarCitasPendientesDeSede = async () => 2;
+  reservaRepository.contarCitasPendientesDeServicio = async () => 3;
+  let llamadoBajaConCitas = false;
+  sedesRepository.eliminar = async () => { llamadoBajaConCitas = true; return true; };
+  serviciosRepository.eliminar = async () => { llamadoBajaConCitas = true; return true; };
+
+  const bajasConCitas = [
+    ['CP-48', 'una sede', () => sedesService.eliminarSede(1)],
+    ['CP-49', 'un servicio', () => serviciosService.eliminarServicio(1)],
+  ];
+  for (const [codigo, nombre, eliminar] of bajasConCitas) {
+    error = await capturarError(eliminar);
+    registrarPrueba(
+      codigo,
+      `Dar de baja ${nombre} con citas pendientes → 409`,
+      error instanceof HttpError && error.status === 409
+        && error.message.includes('citas generadas pendientes') && !llamadoBajaConCitas,
+      'HTTP 409 indicando las citas pendientes y sin dar de baja',
+      error ? `HTTP ${error.status}: ${error.message}` : 'Permitió dar de baja'
+    );
+  }
+
+  // --- SECCIÓN 10: CAPA DE MANEJO DE ERRORES - SEMANA 10 (SEDES, SERVICIOS Y RESERVAS) ---
+  console.log('\n🛡️ 10. Capa de Manejo de Errores - Semana 10 (Sedes, Servicios y Reservas)...');
 
   // SEDES
   sedesRepository.buscarPorId = async () => null;
   error = await capturarError(() => sedesService.buscarSedePorId(999));
   registrarPrueba(
-    'CP-31',
+    'CP-50',
     'Sedes: buscar inexistente lanza NotFoundError (404, NO_ENCONTRADO)',
     error instanceof NotFoundError && error.estado === 404 && error.tipo === 'NO_ENCONTRADO',
     'NotFoundError 404 NO_ENCONTRADO',
@@ -446,7 +690,7 @@ async function ejecutarSuite() {
     telefono: '014445566', hora_apertura: '08:00', hora_cierre: '18:00'
   }));
   registrarPrueba(
-    'CP-32',
+    'CP-51',
     'Sedes: conflicto por nombre duplicado lanza ConflictError (409, CONFLICTO)',
     error instanceof ConflictError && error.estado === 409 && error.tipo === 'CONFLICTO',
     'ConflictError 409 CONFLICTO',
@@ -455,7 +699,7 @@ async function ejecutarSuite() {
 
   error = await capturarError(() => sedesService.actualizarSede(1, {}));
   registrarPrueba(
-    'CP-33',
+    'CP-52',
     'Sedes: actualizar sin campos lanza BadRequestError (400, SOLICITUD_INVALIDA)',
     error instanceof BadRequestError && error.estado === 400 && error.tipo === 'SOLICITUD_INVALIDA',
     'BadRequestError 400 SOLICITUD_INVALIDA',
@@ -466,7 +710,7 @@ async function ejecutarSuite() {
   serviciosRepository.buscarPorId = async () => null;
   error = await capturarError(() => serviciosService.buscarServicioPorId(999));
   registrarPrueba(
-    'CP-34',
+    'CP-53',
     'Servicios: buscar inexistente lanza NotFoundError (404, NO_ENCONTRADO)',
     error instanceof NotFoundError && error.estado === 404 && error.tipo === 'NO_ENCONTRADO',
     'NotFoundError 404 NO_ENCONTRADO',
@@ -478,7 +722,7 @@ async function ejecutarSuite() {
     nombre: 'Alineación', categoria: 'mantenimiento', precio: 120, duracion_min: 45
   }));
   registrarPrueba(
-    'CP-35',
+    'CP-54',
     'Servicios: conflicto por nombre repetido lanza ConflictError (409, CONFLICTO)',
     error instanceof ConflictError && error.estado === 409 && error.tipo === 'CONFLICTO',
     'ConflictError 409 CONFLICTO',
@@ -489,7 +733,7 @@ async function ejecutarSuite() {
     nombre: 'Test', categoria: 'categoria_invalida', precio: -10, duracion_min: 0
   }));
   registrarPrueba(
-    'CP-36',
+    'CP-55',
     'Servicios: datos inválidos lanzan ValidationError (400, VALIDACION) con lista de errores',
     error instanceof ValidationError && error.estado === 400 && error.tipo === 'VALIDACION' && Array.isArray(error.detalle),
     'ValidationError 400 VALIDACION con detalle[]',
@@ -500,7 +744,7 @@ async function ejecutarSuite() {
   reservaRepository.obtenerPorId = async () => null;
   error = await capturarError(() => reservaService.obtenerPorId(999));
   registrarPrueba(
-    'CP-37',
+    'CP-56',
     'Reservas: buscar inexistente lanza NotFoundError (404, NO_ENCONTRADO)',
     error instanceof NotFoundError && error.estado === 404 && error.tipo === 'NO_ENCONTRADO',
     'NotFoundError 404 NO_ENCONTRADO',
@@ -510,12 +754,16 @@ async function ejecutarSuite() {
   lookupsRepository.existeSede = async () => true;
   lookupsRepository.existeServicio = async () => true;
   lookupsRepository.existeVehiculo = async () => true;
+  sedesRepository.buscarPorId = async () => ({
+    id: 1, nombre: 'Kodo Surquillo', hora_apertura: '08:00:00', hora_cierre: '18:00:00', atiende_domingo: false,
+  });
+  serviciosRepository.buscarPorId = async () => ({ id: 1, duracion_min: 120 });
   reservaRepository.existeChoque = async () => true;
   error = await capturarError(() => reservaService.crear({
     fecha: '2026-12-01', hora: '10:00', sede_id: 1, servicio_id: 1, vehiculo_id: 1
   }));
   registrarPrueba(
-    'CP-38',
+    'CP-57',
     'Reservas: choque de horario en misma sede, fecha y hora lanza ConflictError (409, CONFLICTO)',
     error instanceof ConflictError && error.estado === 409 && error.tipo === 'CONFLICTO',
     'ConflictError 409 CONFLICTO',
@@ -524,7 +772,7 @@ async function ejecutarSuite() {
 
   error = await capturarError(() => reservaService.crear({}));
   registrarPrueba(
-    'CP-39',
+    'CP-58',
     'Reservas: body vacío lanza ValidationError (400, VALIDACION) con lista de errores',
     error instanceof ValidationError && error.estado === 400 && error.tipo === 'VALIDACION' && error.detalle.length >= 5,
     'ValidationError 400 VALIDACION con al menos 5 campos faltantes',
@@ -539,7 +787,7 @@ async function ejecutarSuite() {
   };
   trazabilidad(reqFalsa, resFalsaTrazabilidad, () => {});
   registrarPrueba(
-    'CP-40',
+    'CP-59',
     'Trazabilidad: asigna req.idTraza (8 caracteres) y cabecera X-Request-Id',
     typeof reqFalsa.idTraza === 'string' && reqFalsa.idTraza.length === 8 && resFalsaTrazabilidad.cabeceras['X-Request-Id'] === reqFalsa.idTraza,
     'idTraza de 8 caracteres y cabecera X-Request-Id coincidente',
@@ -556,7 +804,7 @@ async function ejecutarSuite() {
     res.cuerpo.idTraza === 'abc12345' &&
     res.cuerpo.ruta === 'GET /api/reservas/999';
   registrarPrueba(
-    'CP-41',
+    'CP-60',
     'Contrato de error: respuesta estándar con { estado, tipo, mensaje, idTraza, ruta }',
     cumpleContrato,
     'Respuesta completa del contrato de error',
@@ -568,7 +816,7 @@ async function ejecutarSuite() {
   let errRol = null;
   autorizar('admin')({ header: () => 'recepcion' }, {}, (err) => { errRol = err; });
   registrarPrueba(
-    'CP-42',
+    'CP-61',
     'Autenticación y Autorización (401 y 403): UnauthorizedError y ForbiddenError',
     errAuth instanceof UnauthorizedError && errAuth.estado === 401 && errAuth.tipo === 'NO_AUTENTICADO' &&
     errRol instanceof ForbiddenError && errRol.estado === 403 && errRol.tipo === 'SIN_PERMISO',
@@ -577,6 +825,7 @@ async function ejecutarSuite() {
   );
 
   // Restaurar repositorios originales
+  Object.assign(lookupsRepository, origLookups);
   Object.assign(repuestosRepository, origRep);
   Object.assign(encuestasRepository, origEnc);
   Object.assign(sedesRepository, origSedes);
