@@ -6,7 +6,7 @@ const {
   ConflictError,
   NotFoundError,
   MAPA_TIPOS,
-} = require('../errors/AppError');
+} = require('./errors/AppError');
 const HttpError = require('../utils/http-error');
 
 const ERRORES_DE_CONEXION = [

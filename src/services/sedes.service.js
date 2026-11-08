@@ -7,7 +7,7 @@ const {
   NotFoundError,
   ConflictError,
   BadRequestError,
-} = require('../errors/AppError');
+} = require('../middlewares/errors/AppError');
 const { hoyISO } = require('../validators/common');
 
 async function listarSedes(filtros = {}) {

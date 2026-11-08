@@ -1,6 +1,6 @@
 // Middleware didáctico de autenticación y autorización (Semana 10, Slide 28)
 // Practica los códigos 401 (sin credenciales / inválida) y 403 (sin permisos suficientes)
-const { UnauthorizedError, ForbiddenError } = require('../errors/AppError');
+const { UnauthorizedError, ForbiddenError } = require('./errors/AppError');
 
 const API_KEY_DEFAULT = process.env.API_KEY || 'kodo-api-key-2026';
 

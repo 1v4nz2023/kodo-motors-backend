@@ -9,7 +9,7 @@ const {
   ConflictError,
   ValidationError,
   BadRequestError,
-} = require('../errors/AppError');
+} = require('../middlewares/errors/AppError');
 const modelo = require('../models/reserva.model');
 const repo = require('../repositories/reserva.repository');
 const lookups = require('../repositories/lookups.repository');

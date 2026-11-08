@@ -1,5 +1,5 @@
 // Utilidades de validación compartidas por los modelos (Semana 10)
-const { BadRequestError, ValidationError } = require('../errors/AppError');
+const { BadRequestError, ValidationError } = require('../middlewares/errors/AppError');
 
 function esTextoValido(valor, maximoCaracteres) {
   return (

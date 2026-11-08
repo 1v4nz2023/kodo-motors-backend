@@ -8,7 +8,7 @@ const {
   ForbiddenError,
   NotFoundError,
   ConflictError,
-} = require('../errors/AppError');
+} = require('../middlewares/errors/AppError');
 
 module.exports = HttpError;
 module.exports.AppError = AppError;

@@ -46,7 +46,7 @@ const {
   ValidationError,
   UnauthorizedError,
   ForbiddenError,
-} = require('./src/errors/AppError');
+} = require('./src/middlewares/errors/AppError');
 const trazabilidad = require('./src/middlewares/trazabilidad');
 const { autenticar, autorizar } = require('./src/middlewares/auth');
 const { validationResult } = require('express-validator');

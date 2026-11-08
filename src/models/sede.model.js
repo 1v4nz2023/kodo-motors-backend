@@ -1,5 +1,5 @@
 // Modelo: reglas de validación de una sede. La baja se hace solo con DELETE (borrado lógico)
-const { ValidationError, BadRequestError } = require('../errors/AppError');
+const { ValidationError, BadRequestError } = require('../middlewares/errors/AppError');
 const {
   esTextoValido,
   convertirBooleano,
