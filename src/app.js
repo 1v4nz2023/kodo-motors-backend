@@ -32,7 +32,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// 3. Rutas principales
+// 3. Rutas principales 
 app.use('/api', rutas);
 
 // 4. Ruta no encontrada: delega a next(new NotFoundError(...)) (Slide 21, 33)
