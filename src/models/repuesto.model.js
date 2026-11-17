@@ -7,6 +7,8 @@ class Repuesto {
     'Mazda2', 'Mazda3', 'CX-3', 'CX-30', 'CX-5', 'CX-50', 'CX-90', 'BT-50', 'MX-5', 'Todos'
   ];
 
+  static PRECIO_MAXIMO = 999999.99;
+
   constructor({
     id,
     codigo,
@@ -50,15 +52,20 @@ class Repuesto {
 
     // 1. Código
     if (!esActualizacion || datos.codigo !== undefined) {
-      if (!datos.codigo || typeof datos.codigo !== 'string' || datos.codigo.trim().length < 3) {
-        errores.push('El campo "codigo" es obligatorio y debe tener al menos 3 caracteres');
+      const codigoValido =
+        typeof datos.codigo === 'string' &&
+        datos.codigo.trim().length >= 3 &&
+        datos.codigo.trim().length <= 20 &&
+        /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(datos.codigo.trim());
+      if (!codigoValido) {
+        errores.push('El campo "codigo" es obligatorio, debe tener entre 3 y 20 caracteres y solo admite letras, números, punto, guion y guion bajo');
       }
     }
 
     // 2. Nombre
     if (!esActualizacion || datos.nombre !== undefined) {
-      if (!datos.nombre || typeof datos.nombre !== 'string' || datos.nombre.trim() === '') {
-        errores.push('El campo "nombre" es obligatorio y no puede estar vacío');
+      if (!datos.nombre || typeof datos.nombre !== 'string' || datos.nombre.trim() === '' || datos.nombre.trim().length > 100) {
+        errores.push('El campo "nombre" es obligatorio y debe tener máximo 100 caracteres');
       }
     }
 
@@ -72,8 +79,14 @@ class Repuesto {
     // 4. Precio
     if (!esActualizacion || datos.precio !== undefined) {
       const precioNum = Number(datos.precio);
-      if (datos.precio === undefined || isNaN(precioNum) || precioNum <= 0) {
-        errores.push('El campo "precio" es obligatorio y debe ser un número mayor a 0');
+      const tieneMaximoDosDecimales = Number.isFinite(precioNum) && Number(precioNum.toFixed(2)) === precioNum;
+      if (
+        datos.precio === undefined ||
+        !tieneMaximoDosDecimales ||
+        precioNum <= 0 ||
+        precioNum > Repuesto.PRECIO_MAXIMO
+      ) {
+        errores.push(`El campo "precio" es obligatorio, debe ser mayor a 0, máximo ${Repuesto.PRECIO_MAXIMO} y tener hasta 2 decimales`);
       }
     }
 
@@ -93,7 +106,14 @@ class Repuesto {
       }
     }
 
-    // 7. Borrado lógico: la bandera solo cambia con DELETE
+    // 7. Ubicación (opcional, coincide con VARCHAR(20))
+    if (datos.ubicacion !== undefined && datos.ubicacion !== null) {
+      if (typeof datos.ubicacion !== 'string' || datos.ubicacion.trim().length > 20) {
+        errores.push('El campo "ubicacion" debe ser texto de máximo 20 caracteres');
+      }
+    }
+
+    // 8. Borrado lógico: la bandera solo cambia con DELETE
     if (datos.activo !== undefined) {
       errores.push('El campo "activo" no se puede enviar; para dar de baja usa DELETE');
     }

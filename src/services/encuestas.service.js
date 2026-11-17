@@ -6,6 +6,10 @@
 const encuestasRepository = require('../repositories/encuestas.repository');
 const Encuesta = require('../models/encuesta.model');
 const HttpError = require('../utils/http-error');
+const { revisarCamposPermitidos } = require('../utils/validaciones');
+
+const CAMPOS_CREACION = ['orden_id', 'puntuacion', 'recomendaria', 'comentario'];
+const CAMPOS_ACTUALIZACION = ['puntuacion', 'recomendaria', 'comentario'];
 
 async function listar(filtros = {}) {
   return await encuestasRepository.findAll(filtros);
@@ -21,6 +25,7 @@ async function obtenerPorId(id) {
 
 async function crear(datos) {
   // 1. Validar forma del dato (puntuación de 1 a 5, recomendaria booleano)
+  revisarCamposPermitidos(datos, CAMPOS_CREACION);
   const errores = Encuesta.validar(datos, false);
   if (errores.length > 0) {
     throw new HttpError(400, 'Datos de encuesta inválidos', errores);
@@ -57,12 +62,17 @@ async function crear(datos) {
 }
 
 async function actualizar(id, datos) {
-  const existente = await obtenerPorId(id);
+  revisarCamposPermitidos(datos, CAMPOS_ACTUALIZACION);
+  if (Object.keys(datos).length === 0) {
+    throw new HttpError(400, 'Envía al menos un campo para actualizar');
+  }
 
   const errores = Encuesta.validar(datos, true);
   if (errores.length > 0) {
     throw new HttpError(400, 'Datos de actualización de encuesta inválidos', errores);
   }
+
+  const existente = await obtenerPorId(id);
 
   const datosCompletos = {
     puntuacion: datos.puntuacion !== undefined ? datos.puntuacion : existente.puntuacion,

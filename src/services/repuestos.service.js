@@ -6,6 +6,11 @@
 const repuestosRepository = require('../repositories/repuestos.repository');
 const Repuesto = require('../models/repuesto.model');
 const HttpError = require('../utils/http-error');
+const { revisarCamposPermitidos } = require('../utils/validaciones');
+
+const CAMPOS_PERMITIDOS = [
+  'codigo', 'nombre', 'modelo_compatible', 'stock', 'stock_minimo', 'precio', 'ubicacion',
+];
 
 async function listar(filtros = {}) {
   return await repuestosRepository.findAll(filtros);
@@ -21,6 +26,7 @@ async function obtenerPorId(id) {
 
 async function crear(datos) {
   // 1. Validar forma y campos obligatorios
+  revisarCamposPermitidos(datos, CAMPOS_PERMITIDOS);
   const errores = Repuesto.validar(datos, false);
   if (errores.length > 0) {
     throw new HttpError(400, 'Datos de repuesto inválidos', errores);
@@ -41,12 +47,17 @@ async function crear(datos) {
 }
 
 async function actualizar(id, datos) {
-  const existente = await obtenerPorId(id);
+  revisarCamposPermitidos(datos, CAMPOS_PERMITIDOS);
+  if (Object.keys(datos).length === 0) {
+    throw new HttpError(400, 'Envía al menos un campo para actualizar');
+  }
 
   const errores = Repuesto.validar(datos, true);
   if (errores.length > 0) {
     throw new HttpError(400, 'Datos de actualización inválidos', errores);
   }
+
+  const existente = await obtenerPorId(id);
 
   // Si actualiza código, verificar que no colisione con otro
   if (datos.codigo && datos.codigo.trim().toUpperCase() !== existente.codigo) {

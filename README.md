@@ -110,7 +110,12 @@ kodo-motor-backend/
 │   ├── middlewares/           # validarId, manejarErrores
 │   ├── validators/            # reglas de express-validator por recurso
 │   └── utils/                 # HttpError, validaciones
-├── test-suite.js              # npm test
+├── tests/
+│   ├── unit/                  # servicios aislados con repositorios simulados
+│   ├── functional/            # endpoints HTTP completos con Supertest
+│   └── helpers/               # aserciones compartidas del contrato de error
+├── test-suite.js              # suite histórica: npm run test:legacy
+├── jest.config.js             # configuración y alcance de cobertura
 ├── docker-compose.yml         # MySQL 8.4 y Adminer
 └── .env.example               # qué variables hay que definir (sin credenciales)
 ```
@@ -127,6 +132,8 @@ kodo-motor-backend/
 | MySQL | 8.4 | Base de datos relacional, en un contenedor Docker |
 | Docker Compose | — | Levanta MySQL y Adminer |
 | nodemon | 3.1 | Reinicia la API al guardar cambios |
+| Jest | 30 | Pruebas unitarias, mocks y cobertura |
+| Supertest | 7 | Pruebas funcionales de la API sin levantar `server.js` |
 | Postman | — | Pruebas de los endpoints |
 
 ## 6. Instalación
@@ -168,7 +175,11 @@ Comprobación rápida: `GET http://localhost:4000/api/salud`.
 |---|---|
 | `npm run dev` | API con reinicio automático |
 | `npm start` | API sin nodemon |
-| `npm test` | 49 pruebas automáticas, sin necesidad de base de datos |
+| `npm test` | Ejecuta las 62 pruebas Jest (unitarias y funcionales) |
+| `npm run test:unit` | Ejecuta 32 pruebas unitarias con repositorios simulados |
+| `npm run test:functional` | Ejecuta 30 pruebas HTTP con Supertest |
+| `npm run test:legacy` | Ejecuta las 49 comprobaciones de la suite histórica |
+| `npm run coverage` | Genera el reporte de cobertura en `coverage/` |
 | `npm run bd:levantar` / `bd:detener` | Levanta o detiene MySQL |
 | `npm run bd:reiniciar` | Borra la base y la vuelve a crear desde `database/` |
 
@@ -209,6 +220,12 @@ La bandera de baja (`activo` / `activa`) **no se envía** en `POST` ni `PUT`: so
 **Pruebas:** importar `postman/kodo-motor-backend.postman_collection.json` en Postman
 (*Import → files*) y ejecutar la colección completa (*Run collection*) con la base recién creada.
 Cada carpeta tiene casos positivos y negativos con su prueba automática del código HTTP.
+La carpeta de Encuestas crea una encuesta para la orden entregada 2, comprueba el conflicto 409,
+la actualiza y finalmente realiza su borrado lógico. Reiniciar la base antes de repetir el flujo.
+
+Las pruebas Jest no requieren MySQL: simulan los repositorios y verifican las reglas de negocio de
+Servicios, Repuestos y Encuestas. Las pruebas funcionales recorren ruta, validadores, controlador,
+servicio y middleware de errores mediante Supertest.
 
 ## 9. Base de datos
 
