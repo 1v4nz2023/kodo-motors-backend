@@ -1,18 +1,23 @@
 /**
- * Rutas: Endpoints del recurso Repuestos (Kodo Motors)
+ * Rutas: Endpoints del recurso Repuestos (Kodo Motors) — Semana 10
  * Prefijo: /api/repuestos · DELETE es borrado lógico
+ * Orden de middlewares: validación de formato -> validación de negocio -> controlador
  */
 const { Router } = require('express');
 const repuestosController = require('../controllers/repuestos.controller');
-const validarId = require('../middlewares/validarId');
+const { idParam } = require('../validators/common');
+const validar = require('../validators/validar');
+const {
+  reglasRepuesto,
+  reglasFiltrosRepuestos,
+} = require('../validators/repuestos.validators');
 
 const router = Router();
 
-// Handlers pasados por referencia (sin paréntesis)
-router.get('/', repuestosController.listar);
-router.get('/:id', validarId, repuestosController.obtenerPorId);
-router.post('/', repuestosController.crear);
-router.put('/:id', validarId, repuestosController.actualizar);
-router.delete('/:id', validarId, repuestosController.eliminar);
+router.get('/', reglasFiltrosRepuestos(), validar, repuestosController.listar);
+router.get('/:id', idParam(), validar, repuestosController.obtenerPorId);
+router.post('/', reglasRepuesto(false), validar, repuestosController.crear);
+router.put('/:id', idParam(), reglasRepuesto(true), validar, repuestosController.actualizar);
+router.delete('/:id', idParam(), validar, repuestosController.eliminar);
 
 module.exports = router;

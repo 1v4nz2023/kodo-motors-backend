@@ -11,6 +11,8 @@
  * 7. Contrato común: validarId y manejarErrores
  * 8. Validadores de sedes, servicios y reservas
  * 9. Reglas de negocio de reservas y bajas con citas pendientes
+ * 10. Validadores Express-Validator de repuestos y encuestas (Semana 10)
+ * 11. Contrato centralizado de error, trazabilidad y asyncHandler (Semana 10)
  */
 
 const fs = require('fs');
@@ -36,7 +38,18 @@ const catalogoRepository = require('./src/repositories/catalogo.repository');
 const reservaRepository = require('./src/repositories/reserva.repository');
 const lookupsRepository = require('./src/repositories/lookups.repository');
 const validarId = require('./src/middlewares/validarId');
-const { manejarErrores } = require('./src/middlewares/manejarErrores');
+const { manejarErrores, rutaNoEncontrada } = require('./src/middlewares/manejarErrores');
+const trazabilidad = require('./src/middlewares/trazabilidad');
+const asyncHandler = require('./src/utils/asyncHandler');
+const {
+  AppError,
+  BadRequestError,
+  ValidationError,
+  NotFoundError,
+  ConflictError,
+  UnauthorizedError,
+  ForbiddenError,
+} = require('./src/middlewares/errors/AppError');
 const { pool } = require('./src/config/db');
 const { validationResult } = require('express-validator');
 const { reglasSede } = require('./src/validators/sedes.validators');
@@ -46,6 +59,15 @@ const {
   reglasActualizarReserva,
   reglasFiltrosReserva,
 } = require('./src/validators/reservas.validators');
+const {
+  reglasRepuesto,
+  reglasFiltrosRepuestos,
+} = require('./src/validators/repuestos.validators');
+const {
+  reglasCrearEncuesta,
+  reglasActualizarEncuesta,
+  reglasFiltrosEncuestas,
+} = require('./src/validators/encuestas.validators');
 
 const resultados = [];
 
@@ -658,6 +680,191 @@ async function ejecutarSuite() {
       error ? `HTTP ${error.status}: ${error.message}` : 'Permitió dar de baja'
     );
   }
+
+  // --- SECCIÓN 10: VALIDADORES EXPRESS-VALIDATOR DE REPUESTOS Y ENCUESTAS ---
+  console.log('\n⚙️ 10. Validadores de Repuestos y Encuestas (Semana 10)...');
+
+  const repuestoValido = {
+    codigo: 'FLT-001',
+    nombre: 'Filtro de Aceite Skyactiv',
+    modelo_compatible: 'CX-5',
+    precio: 45.5,
+    stock: 10,
+    stock_minimo: 3,
+    ubicacion: 'Estante A1',
+  };
+  const sinErroresRepuesto = await camposConError(reglasRepuesto(false), { body: repuestoValido });
+  const erroresRepuestoInvalido = await camposConError(reglasRepuesto(false), {
+    body: {
+      codigo: 'AB',
+      nombre: '',
+      modelo_compatible: 'Inexistente',
+      precio: -10,
+      stock: -5,
+      activo: false,
+    },
+  });
+  registrarPrueba(
+    'CP-50',
+    'Repuestos: acepta válidos y rechaza código corto, modelo inválido, precio <= 0 y activo',
+    sinErroresRepuesto.length === 0 && erroresRepuestoInvalido.length >= 5 && erroresRepuestoInvalido.includes('activo'),
+    '0 errores válidos y al menos 5 campos rechazados incluyendo activo',
+    `válidos=${sinErroresRepuesto.length}, inválidos=${erroresRepuestoInvalido.length}`
+  );
+
+  const parcialRepuesto = await camposConError(reglasRepuesto(true), { body: { precio: 89.9 } });
+  const parcialRepuestoActivo = await camposConError(reglasRepuesto(true), { body: { activo: 1 } });
+  registrarPrueba(
+    'CP-51',
+    'Repuestos: PUT parcial acepta campos individuales y prohíbe activo',
+    parcialRepuesto.length === 0 && parcialRepuestoActivo.includes('activo'),
+    'PUT parcial válido y activo rechazado',
+    `parcial=${parcialRepuesto.length}, activo=${JSON.stringify(parcialRepuestoActivo)}`
+  );
+
+  const filtrosRepuestoOk = await camposConError(reglasFiltrosRepuestos(), {
+    query: { modelo_compatible: 'CX-5', bajo_stock: 'true', incluir_inactivos: 'false' },
+  });
+  const filtrosRepuestoBad = await camposConError(reglasFiltrosRepuestos(), {
+    query: { modelo_compatible: 'Ferrari', bajo_stock: 'talvez' },
+  });
+  registrarPrueba(
+    'CP-52',
+    'Repuestos: filtros de consulta validan modelo y valores booleanos',
+    filtrosRepuestoOk.length === 0 && filtrosRepuestoBad.length === 2,
+    '0 errores con filtros válidos y 2 errores con inválidos',
+    `ok=${filtrosRepuestoOk.length}, bad=${filtrosRepuestoBad.length}`
+  );
+
+  const encuestaValida = {
+    orden_id: 15,
+    puntuacion: 5,
+    recomendaria: true,
+    comentario: 'Excelente servicio técnico',
+  };
+  const sinErroresEncuesta = await camposConError(reglasCrearEncuesta(), { body: encuestaValida });
+  const erroresEncuestaInvalida = await camposConError(reglasCrearEncuesta(), {
+    body: {
+      orden_id: 'abc',
+      puntuacion: 6,
+      recomendaria: 'no_se',
+      activo: 0,
+    },
+  });
+  registrarPrueba(
+    'CP-53',
+    'Encuestas: acepta válidos y rechaza orden_id no entero, puntuación fuera de 1-5 y activo',
+    sinErroresEncuesta.length === 0 && erroresEncuestaInvalida.length >= 3 && erroresEncuestaInvalida.includes('activo'),
+    '0 errores válidos y errores en orden_id, puntuacion, recomendaria, activo',
+    `válidos=${sinErroresEncuesta.length}, inválidos=${erroresEncuestaInvalida.length}`
+  );
+
+  const parcialEncuestaOk = await camposConError(reglasActualizarEncuesta(), { body: { puntuacion: 4 } });
+  const parcialEncuestaOrden = await camposConError(reglasActualizarEncuesta(), { body: { orden_id: 99 } });
+  registrarPrueba(
+    'CP-54',
+    'Encuestas: PUT parcial rechaza modificación de orden_id y acepta actualización de puntuación',
+    parcialEncuestaOk.length === 0 && parcialEncuestaOrden.includes('orden_id'),
+    'Sin errores en cambio de puntuación y error en orden_id',
+    `ok=${parcialEncuestaOk.length}, orden_id_error=${JSON.stringify(parcialEncuestaOrden)}`
+  );
+
+  const filtrosEncuestaOk = await camposConError(reglasFiltrosEncuestas(), {
+    query: { puntuacion: '5', recomendaria: 'true' },
+  });
+  const filtrosEncuestaBad = await camposConError(reglasFiltrosEncuestas(), {
+    query: { puntuacion: '9', recomendaria: 'talvez' },
+  });
+  registrarPrueba(
+    'CP-55',
+    'Encuestas: filtros de consulta validan puntuación 1-5 y formato de recomendaria',
+    filtrosEncuestaOk.length === 0 && filtrosEncuestaBad.length === 2,
+    '0 errores con filtros válidos y 2 errores con inválidos',
+    `ok=${filtrosEncuestaOk.length}, bad=${filtrosEncuestaBad.length}`
+  );
+
+  // --- SECCIÓN 11: CONTRATO DE ERROR CENTRALIZADO Y TRAZABILIDAD (SEMANA 10) ---
+  console.log('\n🛡️ 11. Contrato de Error Centralizado y Trazabilidad (Semana 10)...');
+
+  const reqTrazabilidad = { headers: {} };
+  const resTrazabilidad = {
+    headers: {},
+    setHeader(nombre, valor) { this.headers[nombre] = valor; },
+  };
+  let trazabilidadNext = false;
+  trazabilidad(reqTrazabilidad, resTrazabilidad, () => { trazabilidadNext = true; });
+  registrarPrueba(
+    'CP-56',
+    'Trazabilidad: genera req.idTraza de 8 caracteres y cabecera X-Request-Id (Slide 31)',
+    trazabilidadNext && typeof reqTrazabilidad.idTraza === 'string' && reqTrazabilidad.idTraza.length === 8
+      && resTrazabilidad.headers['X-Request-Id'] === reqTrazabilidad.idTraza,
+    'idTraza de 8 caracteres y cabecera X-Request-Id coincidente',
+    `idTraza=${reqTrazabilidad.idTraza}, header=${resTrazabilidad.headers['X-Request-Id']}`
+  );
+
+  let errorCapturadoAsync = null;
+  const handlerAsyncTest = asyncHandler(async () => {
+    throw new Error('Falla asíncrona controlada');
+  });
+  await handlerAsyncTest({}, {}, (err) => { errorCapturadoAsync = err; });
+  registrarPrueba(
+    'CP-57',
+    'asyncHandler: captura errores asíncronos y los envía a next(error) (Slide 22)',
+    errorCapturadoAsync instanceof Error && errorCapturadoAsync.message === 'Falla asíncrona controlada',
+    'Error pasado a next()',
+    errorCapturadoAsync ? errorCapturadoAsync.message : 'No capturado'
+  );
+
+  const reqContrato = { method: 'POST', originalUrl: '/api/repuestos', idTraza: 'abc12345' };
+  const resContrato = respuestaFalsa();
+  manejarErrores(new ConflictError('El código ya existe'), reqContrato, resContrato, () => {});
+  const cumpleContrato409 = resContrato.codigo === 409
+    && resContrato.cuerpo.estado === 409
+    && resContrato.cuerpo.tipo === 'CONFLICTO'
+    && resContrato.cuerpo.mensaje === 'El código ya existe'
+    && resContrato.cuerpo.idTraza === 'abc12345'
+    && resContrato.cuerpo.ruta === 'POST /api/repuestos';
+  registrarPrueba(
+    'CP-58',
+    'Contrato de error uniforme: { estado, tipo, mensaje, idTraza, ruta } (Slide 26, 29, 38)',
+    cumpleContrato409,
+    'Estructura exacta del estándar de Semana 10',
+    JSON.stringify(resContrato.cuerpo)
+  );
+
+  let errorRutaNoEncontrada = null;
+  rutaNoEncontrada({ method: 'GET', originalUrl: '/api/vehiculo' }, {}, (err) => {
+    errorRutaNoEncontrada = err;
+  });
+  registrarPrueba(
+    'CP-59',
+    'rutaNoEncontrada: delega NotFoundError con next(error) (Slide 33)',
+    errorRutaNoEncontrada instanceof NotFoundError && errorRutaNoEncontrada.status === 404
+      && errorRutaNoEncontrada.message.includes('Ruta no encontrada: GET /api/vehiculo'),
+    'NotFoundError 404 con "Ruta no encontrada: GET /api/vehiculo"',
+    errorRutaNoEncontrada ? `HTTP ${errorRutaNoEncontrada.status}: ${errorRutaNoEncontrada.message}` : 'No delegó'
+  );
+
+  const errorBad = new BadRequestError('Parámetros incorrectos');
+  const errorVal = new ValidationError([{ campo: 'codigo', mensaje: 'Obligatorio' }]);
+  const errorAuth = new UnauthorizedError('Sin llave');
+  const errorForb = new ForbiddenError('Sin rol');
+  const errorNF = new NotFoundError('No existe');
+  const errorConf = new ConflictError('Conflicto');
+  const jerarquiaCorrecta = errorBad.estado === 400 && errorBad.tipo === 'SOLICITUD_INVALIDA'
+    && errorVal.estado === 400 && errorVal.tipo === 'VALIDACION'
+    && errorAuth.estado === 401 && errorAuth.tipo === 'NO_AUTENTICADO'
+    && errorForb.estado === 403 && errorForb.tipo === 'SIN_PERMISO'
+    && errorNF.estado === 404 && errorNF.tipo === 'NO_ENCONTRADO'
+    && errorConf.estado === 409 && errorConf.tipo === 'CONFLICTO'
+    && (errorNF instanceof AppError) && (errorNF instanceof HttpError);
+  registrarPrueba(
+    'CP-60',
+    'Clases de error semánticas: tipos, códigos HTTP e interoperabilidad con HttpError (Slide 23)',
+    jerarquiaCorrecta,
+    'Códigos 400, 401, 403, 404, 409 tipados correctamente',
+    'AppError status y tipos consistentes'
+  );
 
   // Restaurar repositorios originales
   Object.assign(lookupsRepository, origLookups);

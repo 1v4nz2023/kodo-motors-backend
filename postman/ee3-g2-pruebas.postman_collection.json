@@ -1,0 +1,970 @@
+{
+  "info": {
+    "_postman_id": "ee3-g2-pruebas-collection-kodo",
+    "name": "ee3-g2-pruebas · Repuestos y Encuestas (Kodo Motors)",
+    "description": "Plan de pruebas funcional y de manejo de errores (Semana 10) para los servicios de Repuestos y Encuestas de Kodo Motors.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "repuestoNuevoId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "encuestaNuevaId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 · Repuestos",
+      "item": [
+        {
+          "name": "01. Listar repuestos activos (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve lista de repuestos', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('Cabecera X-Request-Id presente', () => pm.expect(pm.response.headers.get('X-Request-Id')).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02. Listar con filtro bajo_stock=true (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos?bajo_stock=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos"],
+              "query": [{ "key": "bajo_stock", "value": "true" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todos los repuestos tienen alertaBajoStock', () => {",
+                  "  const lista = pm.response.json();",
+                  "  pm.expect(lista).to.be.an('array');",
+                  "  lista.forEach(r => pm.expect(r.alertaBajoStock).to.be.true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "03. Buscar repuesto por ID existente (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "1"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Contiene campos de repuesto', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.id).to.eql(1);",
+                  "  pm.expect(r.codigo).to.be.a('string');",
+                  "  pm.expect(r.activo).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04. Buscar con ID no numérico (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/abc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "abc"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Contrato Semana 10 de error', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.estado).to.eql(400);",
+                  "  pm.expect(r.tipo).to.be.oneOf(['VALIDACION', 'SOLICITUD_INVALIDA']);",
+                  "  pm.expect(r.idTraza).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05. Buscar repuesto inexistente ID 999 (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Contrato Semana 10 tipo NO_ENCONTRADO', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.estado).to.eql(404);",
+                  "  pm.expect(r.tipo).to.eql('NO_ENCONTRADO');",
+                  "  pm.expect(r.idTraza).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "06. Registrar repuesto con datos inválidos (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"X\",\n  \"precio\": -50,\n  \"modelo_compatible\": \"Invalido\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Contiene lista detallada de errores', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.tipo).to.eql('VALIDACION');",
+                  "  pm.expect(r.errores).to.be.an('array');",
+                  "  pm.expect(r.errores.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "07. Registrar repuesto con código duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"PE01-14-302\",\n  \"nombre\": \"Filtro Duplicado\",\n  \"modelo_compatible\": \"Todos\",\n  \"precio\": 50.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Contrato Semana 10 tipo CONFLICTO', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.estado).to.eql(409);",
+                  "  pm.expect(r.tipo).to.eql('CONFLICTO');",
+                  "  pm.expect(r.mensaje).to.include('PE01-14-302');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "08. Registrar repuesto válido con stock 0 (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"QA-PRUEBA-01\",\n  \"nombre\": \"Filtro de Prueba QA\",\n  \"modelo_compatible\": \"CX-5\",\n  \"precio\": 65.50,\n  \"stock\": 0,\n  \"stock_minimo\": 2,\n  \"ubicacion\": \"A-99\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 201 Created', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.expect(r.id).to.be.a('number');",
+                  "pm.collectionVariables.set('repuestoNuevoId', r.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "09. Actualizar repuesto enviando campo activo prohibido (400)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 70.00,\n  \"activo\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/{{repuestoNuevoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "{{repuestoNuevoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Rechaza campo activo', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(JSON.stringify(r)).to.include('activo');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Actualizar repuesto válido (200)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 72.00,\n  \"ubicacion\": \"A-99-B\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/{{repuestoNuevoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "{{repuestoNuevoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Precio y ubicación actualizados', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.precio).to.eql(72);",
+                  "  pm.expect(r.ubicacion).to.eql('A-99-B');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Dar de baja repuesto con stock > 0 (400 - Regla Almacén)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/2",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "2"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensaje de bloqueo por stock disponible', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.estado).to.eql(400);",
+                  "  pm.expect(r.mensaje).to.include('stock disponible');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Dar de baja repuesto con stock 0 - Borrado lógico (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/{{repuestoNuevoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "{{repuestoNuevoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "13. Buscar el repuesto dado de baja (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/{{repuestoNuevoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "{{repuestoNuevoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Tipo NO_ENCONTRADO tras borrado lógico', () => pm.expect(pm.response.json().tipo).to.eql('NO_ENCONTRADO'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "14. Dar de baja otra vez el mismo repuesto (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos/{{repuestoNuevoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos", "{{repuestoNuevoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 404 Not Found', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "15. Registrar con código de repuesto dado de baja (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"QA-PRUEBA-01\",\n  \"nombre\": \"Reintento con código inactivo\",\n  \"modelo_compatible\": \"CX-5\",\n  \"precio\": 90.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Mensaje aclara que fue dado de baja', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.tipo).to.eql('CONFLICTO');",
+                  "  pm.expect(r.mensaje).to.include('fue dado de baja');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "16. Listar repuestos incluyendo inactivos (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repuestos?incluir_inactivos=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repuestos"],
+              "query": [{ "key": "incluir_inactivos", "value": "true" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Incluye el repuesto dado de baja', () => {",
+                  "  const lista = pm.response.json();",
+                  "  const targetId = Number(pm.collectionVariables.get('repuestoNuevoId'));",
+                  "  pm.expect(lista.some(r => r.id === targetId && r.activo === false)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 · Encuestas",
+      "item": [
+        {
+          "name": "01. Listar encuestas activas (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve lista de encuestas', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02. Listar encuestas con filtro puntuacion=5 (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas?puntuacion=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas"],
+              "query": [{ "key": "puntuacion", "value": "5" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todas tienen puntuación 5', () => {",
+                  "  const lista = pm.response.json();",
+                  "  lista.forEach(e => pm.expect(e.puntuacion).to.eql(5));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "03. Buscar encuesta existente ID 1 con JOIN a orden (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "1"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Incluye detallesOrden relacionados', () => {",
+                  "  const e = pm.response.json();",
+                  "  pm.expect(e.id).to.eql(1);",
+                  "  pm.expect(e.detallesOrden).to.be.an('object');",
+                  "  pm.expect(e.detallesOrden.tecnico).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04. Buscar encuesta con ID no numérico (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/abc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "abc"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Contrato Semana 10', () => pm.expect(pm.response.json().tipo).to.be.oneOf(['VALIDACION', 'SOLICITUD_INVALIDA']));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05. Buscar encuesta inexistente ID 999 (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Tipo NO_ENCONTRADO', () => pm.expect(pm.response.json().tipo).to.eql('NO_ENCONTRADO'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "06. Registrar encuesta con datos inválidos (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orden_id\": -1,\n  \"puntuacion\": 10,\n  \"recomendaria\": \"quizas\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Retorna errores de validación', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.tipo).to.eql('VALIDACION');",
+                  "  pm.expect(r.errores).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "07. Registrar encuesta para orden inexistente #999 (404)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orden_id\": 999,\n  \"puntuacion\": 5,\n  \"recomendaria\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensaje de orden no encontrada', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.tipo).to.eql('NO_ENCONTRADO');",
+                  "  pm.expect(r.mensaje).to.include('orden de servicio #999 no existe');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "08. Registrar encuesta para orden en estado \"listo\" (400 - Regla Negocio)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orden_id\": 3,\n  \"puntuacion\": 4,\n  \"recomendaria\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Rechazo por orden no entregada', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.mensaje).to.include('Solo se admiten encuestas para órdenes con estado \"entregado\"');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "09. Registrar encuesta para orden #1 que ya tiene encuesta (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orden_id\": 1,\n  \"puntuacion\": 5,\n  \"recomendaria\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Tipo CONFLICTO por duplicidad de encuesta', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.tipo).to.eql('CONFLICTO');",
+                  "  pm.expect(r.mensaje).to.include('ya cuenta con una encuesta');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Registrar encuesta válida para orden entregada #2 (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orden_id\": 2,\n  \"puntuacion\": 5,\n  \"recomendaria\": true,\n  \"comentario\": \"Excelente servicio en el taller de Kodo Motors\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 201 Created', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.expect(r.id).to.be.a('number');",
+                  "pm.expect(r.ordenId).to.eql(2);",
+                  "pm.collectionVariables.set('encuestaNuevaId', r.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Actualizar encuesta enviando campo activo prohibido (400)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"puntuacion\": 4,\n  \"activo\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaNuevaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "{{encuestaNuevaId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Rechaza campo activo', () => pm.expect(JSON.stringify(pm.response.json())).to.include('activo'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Actualizar encuesta intentando cambiar orden_id (400)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orden_id\": 99\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaNuevaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "{{encuestaNuevaId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('orden_id no es editable', () => pm.expect(JSON.stringify(pm.response.json())).to.include('orden_id'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "13. Actualizar encuesta válida (200)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"puntuacion\": 4,\n  \"comentario\": \"Muy buena atención, volveré pronto.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaNuevaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "{{encuestaNuevaId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Campos actualizados', () => {",
+                  "  const r = pm.response.json();",
+                  "  pm.expect(r.puntuacion).to.eql(4);",
+                  "  pm.expect(r.comentario).to.include('Muy buena atención');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "14. Dar de baja encuesta - Borrado lógico (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaNuevaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "{{encuestaNuevaId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "15. Buscar la encuesta dada de baja (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaNuevaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "{{encuestaNuevaId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Tipo NO_ENCONTRADO tras borrado lógico', () => pm.expect(pm.response.json().tipo).to.eql('NO_ENCONTRADO'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "16. Dar de baja nuevamente la misma encuesta (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaNuevaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas", "{{encuestaNuevaId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 404 Not Found', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "17. Listar encuestas incluyendo dadas de baja (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas?incluir_inactivos=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "encuestas"],
+              "query": [{ "key": "incluir_inactivos", "value": "true" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Incluye la encuesta dada de baja', () => {",
+                  "  const lista = pm.response.json();",
+                  "  const targetId = Number(pm.collectionVariables.get('encuestaNuevaId'));",
+                  "  pm.expect(lista.some(e => e.id === targetId && e.activo === false)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -72,21 +72,24 @@ trata como inexistente. Así se conserva el historial de Kodo Motors.
 ### Arquitectura por capas
 
 ```
-Postman ──HTTP──▶ src/app.js ──▶ routes/      (método + URL; validadores antes del controlador)
+Postman ──HTTP──▶ src/app.js ──▶ middlewares/trazabilidad (asigna idTraza y X-Request-Id)
                                    │
                                    ▼
-                                 controllers/  (lee req, responde res; errores a next)
+                                 routes/      (método + URL; validadores express-validator)
                                    │
                                    ▼
-                                 services/     (reglas de negocio; lanza HttpError)
+                                 controllers/ (envueltos en asyncHandler; errores a next)
                                    │
                                    ▼
-                                 repositories/ (único lugar con SQL; placeholders ?)
+                                 services/    (reglas de negocio; lanza AppError / HttpError)
+                                   │
+                                   ▼
+                                 repositories/(único lugar con SQL; placeholders ?)
                                    │
                                    ▼
                                  config/db.js ──▶ MySQL kodo_db (Docker)
 
-Cualquier error ──▶ middlewares/manejarErrores.js ──▶ { "mensaje": "...", "errores": [...] }
+Cualquier error ──▶ middlewares/manejarErrores.js ──▶ { estado, tipo, mensaje, idTraza, ruta, errores }
 ```
 
 ### Estructura de carpetas
@@ -100,17 +103,17 @@ kodo-motor-backend/
 │   └── kodo-motor-backend.postman_collection.json
 ├── src/
 │   ├── server.js              # entrada: prueba MySQL y levanta la API
-│   ├── app.js                 # CORS, JSON, rutas, 404 y errores
+│   ├── app.js                 # trazabilidad, CORS, JSON (10kb), rutas, 404 y errores
 │   ├── config/db.js           # pool de mysql2/promise
 │   ├── routes/                # un archivo por recurso + index.js
-│   ├── controllers/
-│   ├── services/
-│   ├── repositories/
-│   ├── models/
-│   ├── middlewares/           # validarId, manejarErrores
+│   ├── controllers/           # controladores con asyncHandler
+│   ├── services/              # reglas de negocio y lanzamiento de errores semánticos
+│   ├── repositories/          # consultas SQL con soft delete
+│   ├── models/                # entidades de dominio y validación interna
+│   ├── middlewares/           # trazabilidad, validarId, manejarErrores, errors/ (AppError)
 │   ├── validators/            # reglas de express-validator por recurso
-│   └── utils/                 # HttpError, validaciones
-├── test-suite.js              # npm test
+│   └── utils/                 # asyncHandler, HttpError, validaciones
+├── test-suite.js              # npm test (60 pruebas unitarias y de contrato)
 ├── docker-compose.yml         # MySQL 8.4 y Adminer
 └── .env.example               # qué variables hay que definir (sin credenciales)
 ```
@@ -168,7 +171,7 @@ Comprobación rápida: `GET http://localhost:4000/api/salud`.
 |---|---|
 | `npm run dev` | API con reinicio automático |
 | `npm start` | API sin nodemon |
-| `npm test` | 49 pruebas automáticas, sin necesidad de base de datos |
+| `npm test` | 60 pruebas automáticas, sin necesidad de base de datos |
 | `npm run bd:levantar` / `bd:detener` | Levanta o detiene MySQL |
 | `npm run bd:reiniciar` | Borra la base y la vuelve a crear desde `database/` |
 
@@ -195,14 +198,41 @@ Base: `http://localhost:4000/api`. Todos los recursos siguen el mismo contrato.
 | Vehículos (solo lectura) | `GET /api/vehiculos` | — para saber qué `vehiculo_id` usar en una reserva |
 | Salud | `GET /api/salud` | — estado de la API y de la base |
 
-Formato de error, igual en toda la API:
+### Contrato unificado de manejo de errores (Semana 10)
+
+Toda respuesta de error en la API (códigos 4xx y 5xx) comparte un formato JSON consistente, trazable y seguro:
 
 ```json
-{ "mensaje": "Datos inválidos", "errores": [{ "campo": "fecha", "mensaje": "La fecha es obligatoria" }] }
+{
+  "estado": 400,
+  "tipo": "VALIDACION",
+  "mensaje": "Datos inválidos",
+  "idTraza": "e112f708",
+  "ruta": "POST /api/repuestos",
+  "errores": [
+    { "campo": "codigo", "mensaje": "El campo \"codigo\" es obligatorio y debe tener al menos 3 caracteres" }
+  ]
+}
 ```
 
-En sedes, servicios, catálogo y reservas, los errores de formato llegan así, por campo. Las reglas
-que consultan la base responden `{ "mensaje": "..." }`, a veces con `errores` como lista de textos.
+#### Campos del error:
+- **`estado`**: Código numérico de estado HTTP coincidente con la cabecera HTTP.
+- **`tipo`**: Identificador semántico estable para el cliente/frontend (`VALIDACION`, `SOLICITUD_INVALIDA`, `NO_AUTENTICADO`, `SIN_PERMISO`, `NO_ENCONTRADO`, `CONFLICTO`, `CUERPO_MUY_GRANDE`, `ERROR_INTERNO`).
+- **`mensaje`**: Descripción clara y legible orientada al usuario final, sin tecnicismos ni datos internos de base de datos.
+- **`idTraza`**: Identificador alfanumérico único de 8 caracteres por solicitud, coincidente con la cabecera HTTP `X-Request-Id`.
+- **`ruta`**: Método HTTP y ruta consultada (`METODO /ruta`).
+- **`errores`**: (Opcional) Arreglo de fallos detallados por campo `[{ campo, mensaje }]` en errores de validación 400.
+
+#### Códigos HTTP implementados:
+| Código | Tipo Semántico | Cuándo se devuelve | Ejemplo en Repuestos / Encuestas |
+|---|---|---|---|
+| **400** | `VALIDACION` / `SOLICITUD_INVALIDA` | Datos mal formados, campos obligatorios faltantes, tipos/rangos inválidos, orden no entregada o baja de repuesto con stock > 0 | `POST /api/repuestos` con precio < 0; `POST /api/encuestas` para orden en estado "en_proceso"; `DELETE /api/repuestos/1` con stock disponible |
+| **401** | `NO_AUTENTICADO` | Falta de credenciales de acceso o inválidas | `GET /api/admin/resumen` sin cabecera `x-api-key` |
+| **403** | `SIN_PERMISO` | Credenciales válidas pero rol insuficiente | Acceso denegado por rol no autorizado |
+| **404** | `NO_ENCONTRADO` | Ruta no existente en el servidor o recurso no encontrado en la base de datos | `GET /api/repuestos/999`; `DELETE /api/encuestas/999`; `GET /api/vehiculo` (ruta inexistente) |
+| **409** | `CONFLICTO` | Datos sintácticamente válidos pero en choque con el estado del sistema | `POST /api/repuestos` con código duplicado (incluso dado de baja); `POST /api/encuestas` para orden que ya tiene encuesta |
+| **413** | `CUERPO_MUY_GRANDE` | Carga útil del cuerpo excede el límite de seguridad (10 KB) | Solicitud POST con cuerpo superior a 10 KB |
+| **500** | `ERROR_INTERNO` | Excepción imprevista del servidor (base de datos caída, error de ejecución) | Falla no controlada; no expone stacks ni credenciales al cliente y se registra en log con su `idTraza` |
 
 La bandera de baja (`activo` / `activa`) **no se envía** en `POST` ni `PUT`: solo cambia con `DELETE`.
 
