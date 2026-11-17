@@ -1,0 +1,1603 @@
+{
+  "info": {
+    "_postman_id": "e1a70001-kodo-errores-semana10-ucal",
+    "name": "Kodo Motors · Verificación de Manejo de Errores (Semana 10)",
+    "description": "Colección exhaustiva para validar la capa de manejo de errores según la presentación de Semana 10 (Slides 20 a 34). Cubre Arquitectura, Trazabilidad (X-Request-Id e idTraza), Autenticación/Autorización (401/403) y los servicios de Sedes, Servicios y Reservas (400, 404, 409).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "apiKeyValida",
+      "value": "kodo-api-key-2026"
+    },
+    {
+      "key": "fechaLejana",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 · Arquitectura, Trazabilidad y Seguridad (Slides 20, 21, 25, 28, 31, 33)",
+      "item": [
+        {
+          "name": "1.1 Ruta inexistente -> 404 NO_ENCONTRADO (Slide 21, 33)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(404);",
+                  "    pm.expect(json.tipo).to.eql(\"NO_ENCONTRADO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Ruta reportada coincide\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.ruta).to.eql(\"GET /api/ruta-totalmente-inexistente-xyz\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ruta-totalmente-inexistente-xyz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ruta-totalmente-inexistente-xyz"
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.2 JSON mal formado en body -> 400 SOLICITUD_INVALIDA (Slide 25)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"SOLICITUD_INVALIDA\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sedes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"nombre\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "1.3 Autenticación: Falta API Key -> 401 NO_AUTENTICADO (Slide 28)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(401);",
+                  "    pm.expect(json.tipo).to.eql(\"NO_AUTENTICADO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje indica falta de llave\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"Falta x-api-key\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/prueba-auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "prueba-auth"
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.4 Autorización: Rol insuficiente -> 403 SIN_PERMISO (Slide 28)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 403\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(403);",
+                  "    pm.expect(json.tipo).to.eql(\"SIN_PERMISO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje indica rol requerido\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"Requiere rol: admin\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKeyValida}}"
+              },
+              {
+                "key": "x-rol",
+                "value": "cliente"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/prueba-auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "prueba-auth"
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.5 Acceso Autorizado (Admin) -> 200 OK (Slide 28)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cabecera X-Request-Id presente\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "});",
+                  "pm.test(\"Respuesta exitosa\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.ok).to.be.true;",
+                  "    pm.expect(json.mensaje).to.include(\"administrador\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKeyValida}}"
+              },
+              {
+                "key": "x-rol",
+                "value": "admin"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/prueba-auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "prueba-auth"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 · Servicio de Sedes (Slides 23, 24, 34)",
+      "item": [
+        {
+          "name": "2.1 ID inválido no numérico -> 400 VALIDACION (validarId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"VALIDACION\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Detalle de error en parámetro id\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.errores).to.be.an(\"array\");",
+                  "    pm.expect(json.errores[0].campo).to.eql(\"id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sedes/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sedes",
+                "abc"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.2 Buscar sede inexistente -> 404 NO_ENCONTRADO (NotFoundError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(404);",
+                  "    pm.expect(json.tipo).to.eql(\"NO_ENCONTRADO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje menciona que la sede no existe\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"999999\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sedes/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sedes",
+                "999999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.3 Body vacío al registrar -> 400 VALIDACION (ValidationError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"VALIDACION\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Lista de errores incluye campos obligatorios\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.errores).to.be.an(\"array\");",
+                  "    pm.expect(json.errores.length).to.be.at.least(5);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sedes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2.4 Conflicto por nombre duplicado -> 409 CONFLICTO (ConflictError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 409\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(409);",
+                  "    pm.expect(json.tipo).to.eql(\"CONFLICTO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje describe conflicto de nombre\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"Kodo Surquillo\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sedes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Kodo Surquillo\",\n  \"distrito\": \"Surquillo\",\n  \"direccion\": \"Av. Principal 123\",\n  \"telefono\": \"014445566\",\n  \"hora_apertura\": \"08:00\",\n  \"hora_cierre\": \"18:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2.5 PUT sin campos a modificar -> 400 SOLICITUD_INVALIDA (BadRequestError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"SOLICITUD_INVALIDA\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje pide al menos un campo\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"al menos un campo\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sedes/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sedes",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2.6 Eliminar sede inexistente -> 404 NO_ENCONTRADO (NotFoundError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(404);",
+                  "    pm.expect(json.tipo).to.eql(\"NO_ENCONTRADO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sedes/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sedes",
+                "999999"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 · Servicio de Servicios (Slides 23, 24, 34)",
+      "item": [
+        {
+          "name": "3.1 ID inválido no numérico -> 400 VALIDACION (validarId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"VALIDACION\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Detalle de error en parámetro id\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.errores).to.be.an(\"array\");",
+                  "    pm.expect(json.errores[0].campo).to.eql(\"id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios/xyz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "xyz"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.2 Buscar servicio inexistente -> 404 NO_ENCONTRADO (NotFoundError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(404);",
+                  "    pm.expect(json.tipo).to.eql(\"NO_ENCONTRADO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje menciona que el servicio no existe\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"999999\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "999999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.3 Body con datos inválidos -> 400 VALIDACION (ValidationError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"VALIDACION\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Lista de errores incluye campos inválidos\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.errores).to.be.an(\"array\");",
+                  "    pm.expect(json.errores.length).to.be.at.least(3);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"\",\n  \"categoria\": \"categoria_inexistente\",\n  \"precio\": -20,\n  \"duracion_min\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3.4 Conflicto por nombre repetido -> 409 CONFLICTO (ConflictError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 409\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(409);",
+                  "    pm.expect(json.tipo).to.eql(\"CONFLICTO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje describe conflicto de nombre de servicio\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"Mantenimiento 10 000 km\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Mantenimiento 10 000 km\",\n  \"categoria\": \"mantenimiento\",\n  \"precio\": 380,\n  \"duracion_min\": 120\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3.5 PUT sin campos a modificar -> 400 SOLICITUD_INVALIDA (BadRequestError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"SOLICITUD_INVALIDA\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje pide al menos un campo\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"al menos un campo\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3.6 Eliminar servicio inexistente -> 404 NO_ENCONTRADO (NotFoundError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(404);",
+                  "    pm.expect(json.tipo).to.eql(\"NO_ENCONTRADO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "999999"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 · Servicio de Reservas (Slides 23, 24, 34)",
+      "item": [
+        {
+          "name": "4.1 ID inválido no numérico -> 400 VALIDACION (validarId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"VALIDACION\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Detalle de error en parámetro id\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.errores).to.be.an(\"array\");",
+                  "    pm.expect(json.errores[0].campo).to.eql(\"id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservas/cero",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "cero"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.2 Buscar reserva inexistente -> 404 NO_ENCONTRADO (NotFoundError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(404);",
+                  "    pm.expect(json.tipo).to.eql(\"NO_ENCONTRADO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje menciona que la reserva no existe\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"999999\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservas/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "999999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.3 Body vacío al reservar -> 400 VALIDACION (ValidationError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"VALIDACION\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Lista de errores incluye campos requeridos\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.errores).to.be.an(\"array\");",
+                  "    pm.expect(json.errores.length).to.be.at.least(5);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4.4 Regla de Agenda: Cita en fecha pasada -> 400 SOLICITUD_INVALIDA (BadRequestError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"SOLICITUD_INVALIDA\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje explica que la fecha ya pasó\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"pasada\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2020-01-06\",\n  \"hora\": \"10:00\",\n  \"sede_id\": 1,\n  \"servicio_id\": 1,\n  \"vehiculo_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4.5 Regla de Agenda: Más de 30 días de anticipación -> 400 SOLICITUD_INVALIDA (BadRequestError)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Calcula una fecha a 45 días en el futuro para que la prueba nunca expire",
+                  "const f = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);",
+                  "pm.environment.set(\"fechaLejana\", f.toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"SOLICITUD_INVALIDA\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje explica el límite de 30 días\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"30 días\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"{{fechaLejana}}\",\n  \"hora\": \"10:00\",\n  \"sede_id\": 1,\n  \"servicio_id\": 1,\n  \"vehiculo_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4.6 Relación inexistente: Sede no existe -> 404 NO_ENCONTRADO (NotFoundError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(404);",
+                  "    pm.expect(json.tipo).to.eql(\"NO_ENCONTRADO\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje identifica la sede inexistente\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"sede\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-12-15\",\n  \"hora\": \"10:00\",\n  \"sede_id\": 999999,\n  \"servicio_id\": 1,\n  \"vehiculo_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4.7 Campo desconocido rechazado -> 400 VALIDACION (ValidationError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"VALIDACION\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Error menciona el campo desconocido placa\", function () {",
+                  "    var json = pm.response.json();",
+                  "    var texto = JSON.stringify(json.errores);",
+                  "    pm.expect(texto).to.include(\"placa\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-12-15\",\n  \"hora\": \"10:00\",\n  \"sede_id\": 1,\n  \"servicio_id\": 1,\n  \"vehiculo_id\": 1,\n  \"placa\": \"XYZ-999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4.8 PUT sin campos a modificar -> 400 SOLICITUD_INVALIDA (BadRequestError)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Cabecera X-Request-Id presente con 8 caracteres (Slide 31)\", function () {",
+                  "    pm.response.to.have.header(\"X-Request-Id\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.match(/^[a-f0-9]{8}$/);",
+                  "});",
+                  "",
+                  "pm.test(\"Cumple contrato estándar de error (Slides 20, 25, 26)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql(400);",
+                  "    pm.expect(json.tipo).to.eql(\"SOLICITUD_INVALIDA\");",
+                  "    pm.expect(json.mensaje).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(json.idTraza).to.eql(pm.response.headers.get(\"X-Request-Id\"));",
+                  "    pm.expect(json.ruta).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Seguridad: No expone stacktrace ni datos internos (Slides 32-33)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.stack).to.be.undefined;",
+                  "    pm.expect(json.sqlMessage).to.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"Mensaje pide campos para actualizar\", function () {",
+                  "    pm.expect(pm.response.json().mensaje).to.include(\"campo para actualizar\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservas/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

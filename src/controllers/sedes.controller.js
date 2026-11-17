@@ -1,50 +1,31 @@
-// Controlador de sedes: recibe req, llama al servicio y responde; los errores van a next()
+// Controlador de sedes: recibe req, llama al servicio y responde; delega errores con asyncHandler (Semana 10, Slide 9, 22)
+const asyncHandler = require('../utils/asyncHandler');
 const logicaSedes = require('../services/sedes.service');
 
-async function obtenerSedes(req, res, next) {
-  try {
-    const listaSedes = await logicaSedes.listarSedes(req.query);
-    res.status(200).json(listaSedes);
-  } catch (error) {
-    next(error);
-  }
-}
+const obtenerSedes = asyncHandler(async (req, res) => {
+  const listaSedes = await logicaSedes.listarSedes(req.query);
+  res.status(200).json(listaSedes);
+});
 
-async function obtenerSedePorId(req, res, next) {
-  try {
-    const sede = await logicaSedes.buscarSedePorId(Number(req.params.id));
-    res.status(200).json(sede);
-  } catch (error) {
-    next(error);
-  }
-}
+const obtenerSedePorId = asyncHandler(async (req, res) => {
+  const sede = await logicaSedes.buscarSedePorId(Number(req.params.id));
+  res.status(200).json(sede);
+});
 
-async function registrarSede(req, res, next) {
-  try {
-    const sedeNueva = await logicaSedes.crearSede(req.body);
-    res.status(201).json(sedeNueva);
-  } catch (error) {
-    next(error);
-  }
-}
+const registrarSede = asyncHandler(async (req, res) => {
+  const sedeNueva = await logicaSedes.crearSede(req.body);
+  res.status(201).json(sedeNueva);
+});
 
-async function modificarSede(req, res, next) {
-  try {
-    const sedeActualizada = await logicaSedes.actualizarSede(Number(req.params.id), req.body);
-    res.status(200).json(sedeActualizada);
-  } catch (error) {
-    next(error);
-  }
-}
+const modificarSede = asyncHandler(async (req, res) => {
+  const sedeActualizada = await logicaSedes.actualizarSede(Number(req.params.id), req.body);
+  res.status(200).json(sedeActualizada);
+});
 
-async function borrarSede(req, res, next) {
-  try {
-    await logicaSedes.eliminarSede(Number(req.params.id));
-    res.status(204).send();
-  } catch (error) {
-    next(error);
-  }
-}
+const borrarSede = asyncHandler(async (req, res) => {
+  await logicaSedes.eliminarSede(Number(req.params.id));
+  res.status(204).send();
+});
 
 module.exports = {
   obtenerSedes,

@@ -1,5 +1,5 @@
 // Modelo: reglas de validación de un servicio. La baja se hace solo con DELETE (borrado lógico)
-const HttpError = require('../utils/http-error');
+const { ValidationError, BadRequestError } = require('../middlewares/errors/AppError');
 const {
   esTextoValido,
   convertirNumero,
@@ -53,7 +53,7 @@ function validarServicio(datos) {
   }
 
   if (errores.length > 0) {
-    throw new HttpError(400, 'Datos del servicio no válidos', errores);
+    throw new ValidationError(errores, 'Datos del servicio no válidos');
   }
 
   return {
@@ -70,7 +70,7 @@ function validarFiltros(filtros = {}) {
 
   if (filtros.categoria !== undefined) {
     if (!CATEGORIAS_PERMITIDAS.includes(filtros.categoria)) {
-      throw new HttpError(400, `categoria debe ser una de: ${CATEGORIAS_PERMITIDAS.join(', ')}`);
+      throw new BadRequestError(`categoria debe ser una de: ${CATEGORIAS_PERMITIDAS.join(', ')}`);
     }
     filtrosLimpios.categoria = filtros.categoria;
   }
