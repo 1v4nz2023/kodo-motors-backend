@@ -3,6 +3,7 @@
  * Maneja req/res y responde con JSON y códigos HTTP; los errores van a next()
  * y los responde el middleware manejarErrores.
  */
+const { matchedData } = require('express-validator');
 const repuestosService = require('../services/repuestos.service');
 
 async function listar(req, res, next) {
@@ -30,7 +31,8 @@ async function obtenerPorId(req, res, next) {
 
 async function crear(req, res, next) {
   try {
-    const nuevo = await repuestosService.crear(req.body);
+    const datos = matchedData(req, { locations: ['body'], includeOptionals: true });
+    const nuevo = await repuestosService.crear(datos);
     res.status(201).json(nuevo);
   } catch (error) {
     next(error);
@@ -39,7 +41,8 @@ async function crear(req, res, next) {
 
 async function actualizar(req, res, next) {
   try {
-    const actualizado = await repuestosService.actualizar(Number(req.params.id), req.body);
+    const datos = matchedData(req, { locations: ['body'], includeOptionals: true });
+    const actualizado = await repuestosService.actualizar(Number(req.params.id), datos);
     res.status(200).json(actualizado);
   } catch (error) {
     next(error);
