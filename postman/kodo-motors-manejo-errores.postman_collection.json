@@ -12,7 +12,7 @@
     },
     {
       "key": "apiKeyValida",
-      "value": "kodo-api-key-2026"
+      "value": "PON_AQUI_LA_API_KEY_DE_TU_ENV"
     },
     {
       "key": "fechaLejana",
@@ -1598,6 +1598,26 @@
           }
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// /api/sedes y /api/servicios exigen credencial: se agrega aquí para no repetirla en cada petición.",
+          "// Pon en la variable apiKeyValida el mismo valor que tiene API_KEY en tu .env",
+          "if (/^\\/api\\/(sedes|servicios)(\\/|$)/.test(pm.request.url.getPath())) {",
+          "  if (!pm.request.headers.has('x-api-key')) {",
+          "    pm.request.headers.add({ key: 'x-api-key', value: pm.variables.get('apiKeyValida') });",
+          "  }",
+          "  if (!pm.request.headers.has('x-rol')) {",
+          "    pm.request.headers.add({ key: 'x-rol', value: 'admin' });",
+          "  }",
+          "}"
+        ]
+      }
     }
   ]
 }
