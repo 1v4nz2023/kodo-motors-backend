@@ -1,5 +1,5 @@
-// Utilidades de validación compartidas por los modelos
-const HttpError = require('./http-error');
+// Utilidades de validación compartidas por los modelos (Semana 10)
+const { BadRequestError, ValidationError } = require('../middlewares/errors/AppError');
 
 function esTextoValido(valor, maximoCaracteres) {
   return (
@@ -31,16 +31,15 @@ function incluyeInactivos(valor) {
 
 function revisarCamposPermitidos(datos, camposPermitidos) {
   if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
-    throw new HttpError(400, 'El cuerpo de la solicitud debe ser un objeto JSON');
+    throw new BadRequestError('El cuerpo de la solicitud debe ser un objeto JSON');
   }
   const camposDesconocidos = Object.keys(datos).filter(
     (campo) => !camposPermitidos.includes(campo)
   );
   if (camposDesconocidos.length > 0) {
-    throw new HttpError(
-      400,
-      `La solicitud tiene campos no permitidos. Campos permitidos: ${camposPermitidos.join(', ')}`,
-      camposDesconocidos.map((campo) => `${campo} no es un campo permitido`)
+    throw new ValidationError(
+      camposDesconocidos.map((campo) => `${campo} no es un campo permitido`),
+      `La solicitud tiene campos no permitidos. Campos permitidos: ${camposPermitidos.join(', ')}`
     );
   }
 }

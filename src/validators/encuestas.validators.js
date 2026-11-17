@@ -1,86 +1,68 @@
-/**
- * Validadores Express-Validator para Encuestas (Kodo Motors) — Semana 10
- * Separación de la capa de validación HTTP respecto a rutas y servicios.
- */
 const { body, query } = require('express-validator');
-const { textoOpcional } = require('./common');
+const { campo, enteroPositivo, esTextoONumero, textoOpcional } = require('./common');
 
-const reglasCrearEncuesta = () => [
+const CAMPOS_ACTUALIZABLES = ['puntuacion', 'recomendaria', 'comentario'];
+
+const esBooleanoOValor = (valor) =>
+  typeof valor === 'boolean' || esTextoONumero(valor);
+
+// parcial = true en PUT: solo se validan los campos enviados.
+const reglasEncuesta = (parcial = false) => [
   body('id').not().exists().withMessage('El id no se puede enviar'),
+  body('activo').not().exists().withMessage('Activo no se puede enviar; para dar de baja usa DELETE'),
 
-  body('activo').not().exists().withMessage('El campo "activo" no se puede enviar; para dar de baja usa DELETE'),
+  ...(parcial
+    ? [
+        body().custom((valor) => {
+          if (!valor || typeof valor !== 'object' || Array.isArray(valor)) {
+            throw new Error('El cuerpo de la solicitud debe ser un objeto JSON');
+          }
+          if (valor.id !== undefined || valor.activo !== undefined) return true;
+          const tieneCambios = CAMPOS_ACTUALIZABLES.some((c) => valor[c] !== undefined);
+          if (!tieneCambios) {
+            throw new Error('Envía al menos un campo válido para actualizar');
+          }
+          return true;
+        }),
+      ]
+    : []),
 
-  body('orden_id')
-    .notEmpty()
-    .withMessage('El campo "orden_id" es obligatorio y debe ser un número entero positivo')
-    .bail()
-    .isInt({ min: 1 })
-    .withMessage('El campo "orden_id" es obligatorio y debe ser un número entero positivo')
+  // La orden de una encuesta no se cambia: en PUT se rechaza; en POST es obligatoria.
+  ...(parcial
+    ? [body('orden_id').not().exists().withMessage('El orden_id no se puede modificar')]
+    : [enteroPositivo('orden_id', false)]),
+
+  campo('puntuacion', parcial)
+    .notEmpty().withMessage('La puntuación es obligatoria').bail()
+    .custom(esTextoONumero).withMessage('La puntuación debe ser un número entero').bail()
+    .isInt({ min: 1, max: 5 }).withMessage('La puntuación debe ser un entero entre 1 y 5').bail()
     .toInt(),
 
-  body('puntuacion')
-    .notEmpty()
-    .withMessage('El campo "puntuacion" es obligatorio y debe ser un número entero entre 1 y 5')
-    .bail()
-    .isInt({ min: 1, max: 5 })
-    .withMessage('El campo "puntuacion" es obligatorio y debe ser un número entero entre 1 y 5')
-    .toInt(),
-
-  body('recomendaria')
-    .notEmpty()
-    .withMessage('El campo "recomendaria" es obligatorio (true/false o 1/0)')
-    .bail()
-    .isBoolean()
-    .withMessage('El campo "recomendaria" debe ser un valor booleano')
+  campo('recomendaria', parcial)
+    .notEmpty().withMessage('El campo recomendaria es obligatorio').bail()
+    .custom(esBooleanoOValor).withMessage('recomendaria debe ser true o false').bail()
+    .isBoolean().withMessage('recomendaria debe ser true o false').bail()
     .toBoolean(),
 
   textoOpcional('comentario', 300),
 ];
 
-const reglasActualizarEncuesta = () => [
-  body('id').not().exists().withMessage('El id no se puede enviar'),
+// Un parámetro repetido llega como arreglo: isString lo rechaza.
+const reglasFiltrosEncuesta = () => [
+  query('puntuacion').optional()
+    .isString().withMessage('El filtro puntuacion debe ser un solo valor').bail()
+    .isInt({ min: 1, max: 5 }).withMessage('El filtro puntuacion debe ser un entero entre 1 y 5'),
 
-  body('activo').not().exists().withMessage('El campo "activo" no se puede enviar; para dar de baja usa DELETE'),
-
-  body('orden_id')
-    .not()
-    .exists()
-    .withMessage('El campo "orden_id" no se puede modificar una vez creada la encuesta'),
-
-  body('puntuacion')
-    .optional()
-    .isInt({ min: 1, max: 5 })
-    .withMessage('El campo "puntuacion" debe ser un número entero entre 1 y 5')
-    .toInt(),
-
-  body('recomendaria')
-    .optional()
-    .isBoolean()
-    .withMessage('El campo "recomendaria" debe ser un valor booleano')
-    .toBoolean(),
-
-  textoOpcional('comentario', 300),
+  query('recomendaria').optional()
+    .isString().withMessage('El filtro recomendaria debe ser un solo valor').bail()
+    .isIn(['true', 'false', '1', '0']).withMessage('El filtro recomendaria debe ser true, false, 1 o 0'),
 ];
 
-const reglasFiltrosEncuestas = () => [
-  query('puntuacion')
-    .optional()
-    .isInt({ min: 1, max: 5 })
-    .withMessage('El filtro puntuacion debe ser un número entero entre 1 y 5'),
-
-  query('recomendaria')
-    .optional()
-    .isIn(['true', 'false', '1', '0'])
-    .withMessage('El filtro recomendaria debe ser booleano (true o false)'),
-
-  query('incluir_inactivos')
-    .optional()
-    .isIn(['true', 'false', '1', '0'])
-    .withMessage('El filtro incluir_inactivos debe ser booleano (true o false)'),
-];
-
+// Alias con los nombres de la semana 10: el comportamiento es el mismo.
 module.exports = {
-  reglasCrearEncuesta,
-  reglasActualizarEncuesta,
-  reglasFiltrosEncuestas,
+  reglasEncuesta,
+  reglasFiltrosEncuesta,
+  reglasCrearEncuesta: () => reglasEncuesta(false),
+  reglasActualizarEncuesta: () => reglasEncuesta(true),
+  reglasFiltrosEncuestas: reglasFiltrosEncuesta,
 };

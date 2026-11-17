@@ -1,5 +1,6 @@
 # Dependencias (se instalan con npm install)
 node_modules/
+coverage/
 
 # Variables de entorno con claves: NUNCA se suben
 .env

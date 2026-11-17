@@ -55,7 +55,11 @@ class Encuesta {
 
     // 3. Recomendaría (Booleano o 0/1)
     if (!esActualizacion || datos.recomendaria !== undefined) {
-      if (datos.recomendaria === undefined || datos.recomendaria === null) {
+      const esBooleanoValido =
+        typeof datos.recomendaria === 'boolean' ||
+        datos.recomendaria === 0 ||
+        datos.recomendaria === 1;
+      if (!esBooleanoValido) {
         errores.push('El campo "recomendaria" es obligatorio (true/false o 1/0)');
       }
     }

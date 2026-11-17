@@ -1,8 +1,13 @@
-// Servicio de servicios: reglas de negocio; no conoce req/res ni SQL
+// Servicio de servicios: reglas de negocio según Semana 10 (Slides 23, 24, 34)
+// Lanza errores tipados (NotFoundError, ConflictError, BadRequestError)
 const repositorio = require('../repositories/servicios.repository');
 const repositorioReservas = require('../repositories/reserva.repository');
 const modelo = require('../models/servicio.model');
-const HttpError = require('../utils/http-error');
+const {
+  NotFoundError,
+  ConflictError,
+  BadRequestError,
+} = require('../middlewares/errors/AppError');
 const { hoyISO } = require('../validators/common');
 
 async function listarServicios(filtros = {}) {
@@ -13,19 +18,19 @@ async function listarServicios(filtros = {}) {
 async function buscarServicioPorId(id) {
   const servicio = await repositorio.buscarPorId(id);
   if (!servicio) {
-    throw new HttpError(404, `No existe un servicio con id ${id}`);
+    throw new NotFoundError(`No existe un servicio con id ${id}`);
   }
   return servicio;
 }
 
-// El nombre es único también frente a los servicios dados de baja
+// El nombre es único también frente a los servicios dados de baja (Slide 15, 24)
 async function verificarNombreLibre(nombre, idActual = null) {
   const otro = await repositorio.buscarPorNombre(nombre);
   if (!otro || otro.id === idActual) return;
   if (otro.activo) {
-    throw new HttpError(409, `Ya existe un servicio con el nombre "${nombre}"`);
+    throw new ConflictError(`Ya existe un servicio con el nombre "${nombre}"`);
   }
-  throw new HttpError(409, `El nombre "${nombre}" pertenece a un servicio dado de baja (id ${otro.id})`);
+  throw new ConflictError(`El nombre "${nombre}" pertenece a un servicio dado de baja (id ${otro.id})`);
 }
 
 async function crearServicio(datos) {
@@ -40,7 +45,7 @@ async function crearServicio(datos) {
 async function actualizarServicio(id, cambios) {
   modelo.revisarCampos(cambios);
   if (Object.keys(cambios).length === 0) {
-    throw new HttpError(400, 'Envía al menos un campo para actualizar');
+    throw new BadRequestError('Envía al menos un campo para actualizar');
   }
 
   const servicioActual = await buscarServicioPorId(id);
@@ -56,12 +61,12 @@ async function actualizarServicio(id, cambios) {
 async function eliminarServicio(id) {
   const citasPendientes = await repositorioReservas.contarCitasPendientesDeServicio(id, hoyISO());
   if (citasPendientes > 0) {
-    throw new HttpError(409, `No se puede dar de baja el servicio: tiene citas generadas pendientes (${citasPendientes})`);
+    throw new ConflictError(`No se puede dar de baja el servicio: tiene citas generadas pendientes (${citasPendientes})`);
   }
 
   const eliminado = await repositorio.eliminar(id);
   if (!eliminado) {
-    throw new HttpError(404, `No existe un servicio con id ${id}`);
+    throw new NotFoundError(`No existe un servicio con id ${id}`);
   }
 }
 

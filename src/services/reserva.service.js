@@ -1,10 +1,15 @@
 /**
- * Servicio de Reservas: reglas de negocio.
+ * Servicio de Reservas: reglas de negocio según Semana 10 (Slides 23, 24, 34).
  * Valida los datos, verifica que existan sede/servicio/vehículo, que la cita
  * entre en la agenda de la sede y que no haya otra reserva en el mismo horario.
  * Luego llama al repositorio.
  */
-const HttpError = require('../utils/http-error');
+const {
+  NotFoundError,
+  ConflictError,
+  ValidationError,
+  BadRequestError,
+} = require('../middlewares/errors/AppError');
 const modelo = require('../models/reserva.model');
 const repo = require('../repositories/reserva.repository');
 const lookups = require('../repositories/lookups.repository');
@@ -16,13 +21,13 @@ const DIAS_MAXIMOS_ANTICIPACION = 30;
 /** Verifica que los IDs relacionados existan en sus tablas (foreign keys). */
 async function verificarRelaciones(datos) {
   if (datos.sede_id !== undefined && !(await lookups.existeSede(datos.sede_id))) {
-    throw new HttpError(404, `La sede con id ${datos.sede_id} no existe o está dada de baja`);
+    throw new NotFoundError(`La sede con id ${datos.sede_id} no existe o está dada de baja`);
   }
   if (datos.servicio_id !== undefined && !(await lookups.existeServicio(datos.servicio_id))) {
-    throw new HttpError(404, `El servicio con id ${datos.servicio_id} no existe o está dado de baja`);
+    throw new NotFoundError(`El servicio con id ${datos.servicio_id} no existe o está dado de baja`);
   }
   if (datos.vehiculo_id !== undefined && !(await lookups.existeVehiculo(datos.vehiculo_id))) {
-    throw new HttpError(404, `El vehículo con id ${datos.vehiculo_id} no existe`);
+    throw new NotFoundError(`El vehículo con id ${datos.vehiculo_id} no existe`);
   }
 }
 
@@ -36,19 +41,19 @@ async function verificarAgenda({ fecha, hora, sede_id, servicio_id }) {
   const ahora = new Date();
   const inicio = new Date(`${fecha}T${hora}:00`);
   if (inicio <= ahora) {
-    throw new HttpError(400, 'La cita no puede ser en una fecha u hora pasada');
+    throw new BadRequestError('La cita no puede ser en una fecha u hora pasada');
   }
 
   const limite = new Date(ahora);
   limite.setDate(limite.getDate() + DIAS_MAXIMOS_ANTICIPACION);
   limite.setHours(23, 59, 59, 999);
   if (inicio > limite) {
-    throw new HttpError(400, `La cita se puede agendar con máximo ${DIAS_MAXIMOS_ANTICIPACION} días de anticipación`);
+    throw new BadRequestError(`La cita se puede agendar con máximo ${DIAS_MAXIMOS_ANTICIPACION} días de anticipación`);
   }
 
   const sede = await repoSedes.buscarPorId(sede_id);
   if (inicio.getDay() === 0 && !sede.atiende_domingo) {
-    throw new HttpError(400, `La sede ${sede.nombre} no atiende los domingos`);
+    throw new BadRequestError(`La sede ${sede.nombre} no atiende los domingos`);
   }
 
   const servicio = await repoServicios.buscarPorId(servicio_id);
@@ -57,8 +62,7 @@ async function verificarAgenda({ fecha, hora, sede_id, servicio_id }) {
     || minutoInicio + servicio.duracion_min > minutosDelDia(sede.hora_cierre)) {
     const apertura = sede.hora_apertura.slice(0, 5);
     const cierre = sede.hora_cierre.slice(0, 5);
-    throw new HttpError(
-      400,
+    throw new BadRequestError(
       `El servicio dura ${servicio.duracion_min} minutos y debe empezar y terminar dentro del horario de la sede (${apertura} a ${cierre})`,
     );
   }
@@ -67,20 +71,20 @@ async function verificarAgenda({ fecha, hora, sede_id, servicio_id }) {
 /** Ni la sede ni el vehículo pueden tener otra reserva vigente en ese horario. */
 async function verificarChoques(cita, idExcluir = null) {
   if (await repo.existeChoque(cita, idExcluir)) {
-    throw new HttpError(409, 'Ya existe otra reserva en esa sede, fecha y hora');
+    throw new ConflictError('Ya existe otra reserva en esa sede, fecha y hora');
   }
   if (await repo.existeChoqueVehiculo(cita, idExcluir)) {
-    throw new HttpError(409, 'El vehículo ya tiene otra reserva en esa fecha y hora');
+    throw new ConflictError('El vehículo ya tiene otra reserva en esa fecha y hora');
   }
 }
 
 function verificarTransicion(estadoActual, estadoNuevo) {
   const permitidos = modelo.TRANSICIONES[estadoActual];
   if (permitidos.length === 0) {
-    throw new HttpError(409, `La reserva está ${estadoActual} y ya no se puede modificar`);
+    throw new ConflictError(`La reserva está ${estadoActual} y ya no se puede modificar`);
   }
   if (estadoNuevo !== undefined && estadoNuevo !== estadoActual && !permitidos.includes(estadoNuevo)) {
-    throw new HttpError(409, `Una reserva ${estadoActual} solo puede pasar a: ${permitidos.join(', ')}`);
+    throw new ConflictError(`Una reserva ${estadoActual} solo puede pasar a: ${permitidos.join(', ')}`);
   }
 }
 
@@ -90,7 +94,7 @@ async function listar(filtros) {
 
 async function obtenerPorId(id) {
   const reserva = await repo.obtenerPorId(id);
-  if (!reserva) throw new HttpError(404, `La reserva con id ${id} no existe`);
+  if (!reserva) throw new NotFoundError(`La reserva con id ${id} no existe`);
   return reserva;
 }
 
@@ -98,7 +102,7 @@ async function crear(body) {
   modelo.revisarCampos(body);
 
   const errores = modelo.validar(body);
-  if (errores.length) throw new HttpError(400, 'Datos de reserva inválidos', errores);
+  if (errores.length) throw new ValidationError(errores, 'Datos de reserva inválidos');
 
   const datos = modelo.limpiar(body);
   await verificarRelaciones(datos);
@@ -109,15 +113,15 @@ async function crear(body) {
 }
 
 async function actualizar(id, body) {
-  const actual = await obtenerPorId(id); // lanza 404 si no existe
+  const actual = await obtenerPorId(id); // lanza NotFoundError si no existe
   modelo.revisarCampos(body);
 
   const errores = modelo.validar(body, { parcial: true });
-  if (errores.length) throw new HttpError(400, 'Datos de reserva inválidos', errores);
+  if (errores.length) throw new ValidationError(errores, 'Datos de reserva inválidos');
 
   const datos = modelo.limpiar(body);
   if (Object.keys(datos).length === 0) {
-    throw new HttpError(400, 'No se envió ningún campo para actualizar');
+    throw new BadRequestError('No se envió ningún campo para actualizar');
   }
 
   verificarTransicion(actual.estado, datos.estado);
@@ -149,7 +153,7 @@ async function actualizar(id, body) {
 
 async function eliminar(id) {
   const eliminada = await repo.eliminar(id);
-  if (!eliminada) throw new HttpError(404, `La reserva con id ${id} no existe`);
+  if (!eliminada) throw new NotFoundError(`La reserva con id ${id} no existe`);
 }
 
 module.exports = { listar, obtenerPorId, crear, actualizar, eliminar };

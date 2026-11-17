@@ -3,6 +3,7 @@
  * Delega la lógica de negocio al servicio y los errores al middleware central.
  * Envuelto con asyncHandler para capturar rechazos asíncronos automáticamente (Slide 22).
  */
+const { matchedData } = require('express-validator');
 const asyncHandler = require('../utils/asyncHandler');
 const encuestasService = require('../services/encuestas.service');
 
@@ -17,12 +18,12 @@ const obtenerPorId = asyncHandler(async (req, res) => {
 });
 
 const crear = asyncHandler(async (req, res) => {
-  const nueva = await encuestasService.crear(req.body);
+  const nueva = await encuestasService.crear(matchedData(req, { locations: ['body'], includeOptionals: true }));
   res.status(201).json(nueva);
 });
 
 const actualizar = asyncHandler(async (req, res) => {
-  const actualizada = await encuestasService.actualizar(Number(req.params.id), req.body);
+  const actualizada = await encuestasService.actualizar(Number(req.params.id), matchedData(req, { locations: ['body'], includeOptionals: true }));
   res.status(200).json(actualizada);
 });
 

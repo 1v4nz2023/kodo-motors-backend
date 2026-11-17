@@ -1,5 +1,5 @@
 // Modelo: reglas de validación de una sede. La baja se hace solo con DELETE (borrado lógico)
-const HttpError = require('../utils/http-error');
+const { ValidationError, BadRequestError } = require('../middlewares/errors/AppError');
 const {
   esTextoValido,
   convertirBooleano,
@@ -66,7 +66,7 @@ function validarSede(datos) {
   if (atiendeDomingo === null) errores.push('atiende_domingo debe ser true o false');
 
   if (errores.length > 0) {
-    throw new HttpError(400, 'Datos de la sede no válidos', errores);
+    throw new ValidationError(errores, 'Datos de la sede no válidos');
   }
 
   return {
@@ -85,7 +85,7 @@ function validarFiltros(filtros = {}) {
 
   if (filtros.distrito !== undefined) {
     if (!esTextoValido(filtros.distrito, 60)) {
-      throw new HttpError(400, 'El filtro distrito no es válido');
+      throw new BadRequestError('El filtro distrito no es válido');
     }
     filtrosLimpios.distrito = filtros.distrito.trim();
   }

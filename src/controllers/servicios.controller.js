@@ -1,50 +1,31 @@
-// Controlador de servicios: recibe req, llama al servicio y responde; los errores van a next()
+// Controlador de servicios: recibe req, llama al servicio y responde; delega errores con asyncHandler (Semana 10, Slide 9, 22)
+const asyncHandler = require('../utils/asyncHandler');
 const logicaServicios = require('../services/servicios.service');
 
-async function obtenerServicios(req, res, next) {
-  try {
-    const listaServicios = await logicaServicios.listarServicios(req.query);
-    res.status(200).json(listaServicios);
-  } catch (error) {
-    next(error);
-  }
-}
+const obtenerServicios = asyncHandler(async (req, res) => {
+  const listaServicios = await logicaServicios.listarServicios(req.query);
+  res.status(200).json(listaServicios);
+});
 
-async function obtenerServicioPorId(req, res, next) {
-  try {
-    const servicio = await logicaServicios.buscarServicioPorId(Number(req.params.id));
-    res.status(200).json(servicio);
-  } catch (error) {
-    next(error);
-  }
-}
+const obtenerServicioPorId = asyncHandler(async (req, res) => {
+  const servicio = await logicaServicios.buscarServicioPorId(Number(req.params.id));
+  res.status(200).json(servicio);
+});
 
-async function registrarServicio(req, res, next) {
-  try {
-    const servicioNuevo = await logicaServicios.crearServicio(req.body);
-    res.status(201).json(servicioNuevo);
-  } catch (error) {
-    next(error);
-  }
-}
+const registrarServicio = asyncHandler(async (req, res) => {
+  const servicioNuevo = await logicaServicios.crearServicio(req.body);
+  res.status(201).json(servicioNuevo);
+});
 
-async function modificarServicio(req, res, next) {
-  try {
-    const servicioActualizado = await logicaServicios.actualizarServicio(Number(req.params.id), req.body);
-    res.status(200).json(servicioActualizado);
-  } catch (error) {
-    next(error);
-  }
-}
+const modificarServicio = asyncHandler(async (req, res) => {
+  const servicioActualizado = await logicaServicios.actualizarServicio(Number(req.params.id), req.body);
+  res.status(200).json(servicioActualizado);
+});
 
-async function borrarServicio(req, res, next) {
-  try {
-    await logicaServicios.eliminarServicio(Number(req.params.id));
-    res.status(204).send();
-  } catch (error) {
-    next(error);
-  }
-}
+const borrarServicio = asyncHandler(async (req, res) => {
+  await logicaServicios.eliminarServicio(Number(req.params.id));
+  res.status(204).send();
+});
 
 module.exports = {
   obtenerServicios,

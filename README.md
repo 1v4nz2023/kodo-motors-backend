@@ -1,168 +1,91 @@
-# Kodo Motors API · kodo-motor-backend
+# Kodo Motors API · Encuestas y Repuestos
 
 ![Kodo Motors](assets/banner.png)
 
-API REST por capas de Kodo Motors con Node.js, Express y MySQL. Integra en un solo backend los
-módulos que desarrollaron tres equipos del curso **Fundamentos de Desarrollo Back-End** (UCAL,
-Evidencia Evaluativa 2): sedes, servicios, catálogo de vehículos, reservas, repuestos y encuestas.
+API REST de **Kodo Motors** (taller y venta de vehículos Mazda) con Node.js, Express y MySQL.
+Este documento corresponde a la **Evidencia Evaluativa 3** del curso *Fundamentos de Desarrollo Back-End*
+(UCAL) y documenta los servicios **Encuestas** y **Repuestos** del **equipo E2 (rama `G2-EE3`)**.
 
 ## Contenido
 
-1. [Nombre del proyecto](#1-nombre-del-proyecto)
-2. [Integrantes del equipo](#2-integrantes-del-equipo)
-3. [Empresa aliada](#3-empresa-aliada)
-4. [Descripción de la solución](#4-descripción-de-la-solución)
-5. [Tecnologías utilizadas](#5-tecnologías-utilizadas)
-6. [Instalación](#6-instalación)
-7. [Ejecución](#7-ejecución)
-8. [Endpoints principales](#8-endpoints-principales)
-9. [Base de datos](#9-base-de-datos)
-10. [Observaciones y problemas resueltos durante la integración](#10-observaciones-y-problemas-resueltos-durante-la-integración)
+1. [Empresa aliada](#1-empresa-aliada)
+2. [Equipo](#2-equipo)
+3. [Tecnologías](#3-tecnologías)
+4. [Estructura del proyecto](#4-estructura-del-proyecto)
+5. [Instalación](#5-instalación)
+6. [Ejecución](#6-ejecución)
+7. [Variables de entorno](#7-variables-de-entorno)
+8. [Endpoints](#8-endpoints)
+9. [Pruebas](#9-pruebas)
+10. [Incidencias detectadas](#10-incidencias-detectadas)
 
----
+## 1. Empresa aliada
 
-## 1. Nombre del proyecto
+**Kodo Motors**, empresa limeña especializada en vehículos Mazda, con tres líneas de trabajo: venta de
+vehículos, servicio de taller y venta de repuestos.
 
-**kodo-motor-backend** — API REST de Kodo Motors.
+## 2. Equipo
 
-## 2. Integrantes del equipo
+| Integrante | Responsabilidad en la EE3 |
+|---|---|
+| Adso Martin Obregon Gutierrez | Semana 9 · validaciones |
+| Iván Hermilio Mera Ibarguen | Semana 10 · manejo de errores |
+| Lenin David Mamani Sarmiento | Semana 11 · pruebas |
+| Sharmili Luzmer Soncco Lupa | Documentación |
+| Geraldo Fair Jaramillo Florida (líder técnico) | Documentación · revisión y merge |
+| Rodrigo Alonso | Documentación QA (reporte de pruebas) |
 
-El proyecto une el trabajo de tres equipos. El historial de git conserva los commits originales
-de cada uno (ver [Trabajo colaborativo](#trabajo-colaborativo-en-github)).
+## 3. Tecnologías
 
-Solo figuran quienes tienen commits; cada responsabilidad corresponde a lo que muestra el historial de git.
+| Tecnología | Uso |
+|---|---|
+| Node.js 18 o superior | Entorno de ejecución |
+| Express 5 | Servidor HTTP y rutas |
+| express-validator | Validación de datos de entrada |
+| MySQL 8.4 (Docker) y `mysql2` | Base de datos relacional y conexión |
+| `dotenv` y `cors` | Variables de entorno y CORS |
+| nodemon | Reinicio automático en desarrollo |
+| Postman | Pruebas manuales de los endpoints |
 
-| Integrante | Módulo | Responsabilidad |
-|---|---|---|
-| Rachel Duarte | Sedes y Servicios | Base del proyecto en `main` (configuración, Docker, base de datos, conexión a MySQL y manejo de errores); capas de modelos y repositorios; colección Postman; integración de las ramas y resolución del conflicto en `routes/index.js`; fusión de los tres repositorios en `kodo-motor-backend` |
-| Felipe Reyes Ingunza | Servicios | Capa de servicio (`servicios.service.js`) |
-| Omar Vargas | Sedes | Capa de servicio (`sedes.service.js`) |
-| Alessandro Arias (alemarquina) | Sedes y Servicios | Controladores y rutas de `/api/sedes` y `/api/servicios` |
-| Jesús Valencia | Reservas | Estructura base y base de datos inicial (Docker, esquema y seed); conexión a MySQL; archivos base de reservas (modelo, repositorio, servicio, controlador y rutas); rutas de consulta de vehículos |
-| Jefferson Mamani | Reservas | Repositorios de reservas y de consultas (lookups); README inicial |
-| Piero Batti | Reservas | Modelo de reserva; manejo central de errores y validación de id; README y colección Postman de reservas; integración del módulo de catálogo |
-| Edgard Huamán | Catálogo | Módulo de catálogo completo en 5 capas (modelo, repositorio, servicio, controlador y rutas); resolución del conflicto en `main.js`; README |
-| Ivan Hermilio Mera Ibarguen | Repuestos y Encuestas | Arquitectura base (Express, pool MySQL, Docker, esquema y seed); estructura inicial de repuestos y encuestas; plantilla de ficha técnica; borrado lógico, reglas de negocio y `test-suite.js` |
-| Geraldo Fair Jaramillo Florida | Repuestos y Encuestas | Modelo y repositorio de repuestos; integración de servicios, controladores y rutas de repuestos y encuestas; README y banner; revisión e integración de los pull requests |
-| Adso | Encuestas | Modelo de encuesta y repositorio con JOIN a órdenes de servicio |
+## 4. Estructura del proyecto
 
-## 3. Empresa aliada
-
-**Kodo Motors**, empresa limeña especializada en vehículos Mazda, con tres líneas de trabajo:
-venta de vehículos, servicio de taller y venta de repuestos.
-
-## 4. Descripción de la solución
-
-Un backend que gestiona la información de las tres líneas del negocio sobre una sola base de
-datos (`kodo_db`, modelo común de la clase):
-
-| Recurso | Qué gestiona | Reglas principales |
-|---|---|---|
-| Sedes | Locales: distrito, dirección, teléfono y horario | Nombre único; teléfono fijo o celular de 9 dígitos; apertura antes del cierre; no se da de baja con citas pendientes |
-| Servicios | Trabajos del taller: categoría, precio y duración | Nombre único; categorías cerradas; duración de 15 a 480 minutos; no se da de baja con citas pendientes |
-| Catálogo | Vehículos Mazda nuevos en venta | Modelo + versión + año no se repite |
-| Reservas | Citas de taller por sede, servicio y vehículo | Citas futuras, cada 30 minutos y con máximo 30 días de anticipación; dentro del horario de la sede; sin dos reservas vigentes en la misma sede o para el mismo vehículo en la misma fecha y hora; `pendiente → confirmada/cancelada`, `confirmada → atendida/cancelada`; sede y servicio activos |
-| Repuestos | Inventario con alerta de bajo stock | Código único; no se da de baja con stock disponible |
-| Encuestas | Satisfacción del cliente por orden de servicio | Solo órdenes entregadas; una encuesta por orden |
-
-**Borrado lógico en todo el proyecto.** Ningún registro se elimina de la base. `DELETE` marca el
-registro como dado de baja (`activo = 0`, o `activa = 0` en sedes) y desde ese momento la API lo
-trata como inexistente. Así se conserva el historial de Kodo Motors.
-
-### Arquitectura por capas
-
-```
-Postman ──HTTP──▶ src/app.js ──▶ middlewares/trazabilidad (asigna idTraza y X-Request-Id)
-                                   │
-                                   ▼
-                                 routes/      (método + URL; validadores express-validator)
-                                   │
-                                   ▼
-                                 controllers/ (envueltos en asyncHandler; errores a next)
-                                   │
-                                   ▼
-                                 services/    (reglas de negocio; lanza AppError / HttpError)
-                                   │
-                                   ▼
-                                 repositories/(único lugar con SQL; placeholders ?)
-                                   │
-                                   ▼
-                                 config/db.js ──▶ MySQL kodo_db (Docker)
-
-Cualquier error ──▶ middlewares/manejarErrores.js ──▶ { estado, tipo, mensaje, idTraza, ruta, errores }
+```text
+src/
+├── app.js                 # Express: middlewares globales, rutas y manejo de errores
+├── server.js              # Arranque: prueba la conexión a MySQL y escucha el puerto
+├── config/                # Conexión a MySQL (pool)
+├── routes/                # Rutas por recurso
+├── controllers/           # Reciben la petición y responden
+├── services/              # Reglas de negocio
+├── repositories/          # Consultas SQL
+├── models/                # Validación y forma de cada recurso
+├── validators/            # Reglas de express-validator
+├── middlewares/           # manejarErrores.js y validarId.js
+└── utils/                 # Utilidades compartidas
+database/                  # 01_schema.sql y 02_seed.sql
+postman/                   # Colección de Postman
+assets/                    # Logo
 ```
 
-### Estructura de carpetas
-
-```
-kodo-motor-backend/
-├── database/
-│   ├── 01_schema.sql          # 14 tablas de kodo_db, trigger de encuestas
-│   └── 02_seed.sql            # datos de ejemplo
-├── postman/
-│   └── kodo-motor-backend.postman_collection.json
-├── src/
-│   ├── server.js              # entrada: prueba MySQL y levanta la API
-│   ├── app.js                 # trazabilidad, CORS, JSON (10kb), rutas, 404 y errores
-│   ├── config/db.js           # pool de mysql2/promise
-│   ├── routes/                # un archivo por recurso + index.js
-│   ├── controllers/           # controladores con asyncHandler
-│   ├── services/              # reglas de negocio y lanzamiento de errores semánticos
-│   ├── repositories/          # consultas SQL con soft delete
-│   ├── models/                # entidades de dominio y validación interna
-│   ├── middlewares/           # trazabilidad, validarId, manejarErrores, errors/ (AppError)
-│   ├── validators/            # reglas de express-validator por recurso
-│   └── utils/                 # asyncHandler, HttpError, validaciones
-├── test-suite.js              # npm test (60 pruebas unitarias y de contrato)
-├── docker-compose.yml         # MySQL 8.4 y Adminer
-└── .env.example               # qué variables hay que definir (sin credenciales)
-```
-
-## 5. Tecnologías utilizadas
-
-| Tecnología | Versión | Para qué se usa |
-|---|---|---|
-| Node.js | 18 o superior | Ejecuta JavaScript en el servidor |
-| Express | 5.2 | Servidor HTTP, rutas y middlewares |
-| mysql2 | 3.24 | Pool de conexiones y consultas con placeholders |
-| dotenv | 17.4 | Lee el archivo `.env` |
-| cors | 2.8 | Permite que un frontend en otra dirección consuma la API |
-| MySQL | 8.4 | Base de datos relacional, en un contenedor Docker |
-| Docker Compose | — | Levanta MySQL y Adminer |
-| nodemon | 3.1 | Reinicia la API al guardar cambios |
-| Postman | — | Pruebas de los endpoints |
-
-## 6. Instalación
+## 5. Instalación
 
 Requisitos: Node.js 18+, Docker Desktop abierto y Git.
 
 ```bash
-git clone https://github.com/rachelduarte/kodo-motor-backend.git
-cd kodo-motor-backend
+git clone https://github.com/jcondori-ucal/kodo-motors-backend.git
+cd kodo-motors-backend
+git switch G2-EE3
 npm install
-```
-
-Crear el archivo `.env` a partir de la plantilla y **reemplazar cada texto por su valor real**
-(el usuario y la contraseña de MySQL los elige cada integrante; no se suben a GitHub):
-
-```bash
 cp .env.example .env
 ```
 
-En Windows (cmd): `copy .env.example .env`.
+En Windows (cmd): `copy .env.example .env`. Luego se reemplaza cada texto del `.env` por el valor real.
 
-## 7. Ejecución
+## 6. Ejecución
 
 ```bash
 docker compose up -d      # levanta MySQL (puerto 3307) y Adminer (puerto 8081)
 npm run dev               # levanta la API en http://localhost:4000
-```
-
-La consola debe mostrar:
-
-```
-✔ Conectado a MySQL 8.4.x · base de datos: kodo_db
-✔ API de Kodo Motors en http://localhost:4000
 ```
 
 Comprobación rápida: `GET http://localhost:4000/api/salud`.
@@ -171,136 +94,225 @@ Comprobación rápida: `GET http://localhost:4000/api/salud`.
 |---|---|
 | `npm run dev` | API con reinicio automático |
 | `npm start` | API sin nodemon |
-| `npm test` | 60 pruebas automáticas, sin necesidad de base de datos |
-| `npm run bd:levantar` / `bd:detener` | Levanta o detiene MySQL |
+| `npm test` | Ejecuta `test-suite.js` (sin necesidad de base de datos) |
+| `npm run bd:levantar` · `bd:detener` | Levanta o detiene MySQL |
 | `npm run bd:reiniciar` | Borra la base y la vuelve a crear desde `database/` |
 
-## 8. Endpoints principales
+## 7. Variables de entorno
 
-Base: `http://localhost:4000/api`. Todos los recursos siguen el mismo contrato.
+El archivo `.env` **no se sube a GitHub**; solo se sube la plantilla `.env.example`, que contiene las claves:
 
-| Método | Ruta | Respuesta |
-|---|---|---|
-| GET | `/<recurso>` | 200 · arreglo de registros activos. `?incluir_inactivos=true` incluye los dados de baja |
-| GET | `/<recurso>/:id` | 200 · el registro · 400 id inválido · 404 no existe o está dado de baja |
-| POST | `/<recurso>` | 201 · el registro creado · 400 datos inválidos · 409 valor único repetido |
-| PUT | `/<recurso>/:id` | 200 · el registro actualizado · 400 · 404 · 409 |
-| DELETE | `/<recurso>/:id` | 204 sin cuerpo (borrado lógico) · 404 si no existe o ya estaba de baja · 409 sede o servicio con citas pendientes |
+`PORT`, `CORS_ORIGIN`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `MYSQL_ROOT_PASSWORD`.
 
-| Recurso | Ruta | Filtros del listado |
-|---|---|---|
-| Sedes | `/api/sedes` | `distrito` |
-| Servicios | `/api/servicios` | `categoria` |
-| Catálogo | `/api/catalogo` | — |
-| Reservas | `/api/reservas` | `estado`, `fecha`, `sede_id` |
-| Repuestos | `/api/repuestos` | `modelo_compatible`, `bajo_stock=true` |
-| Encuestas | `/api/encuestas` | `puntuacion`, `recomendaria` |
-| Vehículos (solo lectura) | `GET /api/vehiculos` | — para saber qué `vehiculo_id` usar en una reserva |
-| Salud | `GET /api/salud` | — estado de la API y de la base |
+## 8. Endpoints
 
-### Contrato unificado de manejo de errores (Semana 10)
+Base: `http://localhost:4000/api` · Formato: JSON · Persistencia: MySQL 8.4 (Docker).
+Cada endpoint indica método, ruta, parámetros, cuerpo, ejemplo de respuesta exitosa, ejemplo de error y códigos HTTP.
 
-Toda respuesta de error en la API (códigos 4xx y 5xx) comparte un formato JSON consistente, trazable y seguro:
+### 8.1 Formato de error único
+
+Toda respuesta de error, de cualquier endpoint, tiene esta forma:
 
 ```json
 {
-  "estado": 400,
-  "tipo": "VALIDACION",
-  "mensaje": "Datos inválidos",
-  "idTraza": "e112f708",
-  "ruta": "POST /api/repuestos",
-  "errores": [
-    { "campo": "codigo", "mensaje": "El campo \"codigo\" es obligatorio y debe tener al menos 3 caracteres" }
-  ]
+  "estado": 404,
+  "tipo": "NO_ENCONTRADO",
+  "mensaje": "Repuesto con ID 999 no encontrado en el inventario",
+  "idTraza": "d221180f",
+  "ruta": "GET /api/repuestos/999"
 }
 ```
 
-#### Campos del error:
-- **`estado`**: Código numérico de estado HTTP coincidente con la cabecera HTTP.
-- **`tipo`**: Identificador semántico estable para el cliente/frontend (`VALIDACION`, `SOLICITUD_INVALIDA`, `NO_AUTENTICADO`, `SIN_PERMISO`, `NO_ENCONTRADO`, `CONFLICTO`, `CUERPO_MUY_GRANDE`, `ERROR_INTERNO`).
-- **`mensaje`**: Descripción clara y legible orientada al usuario final, sin tecnicismos ni datos internos de base de datos.
-- **`idTraza`**: Identificador alfanumérico único de 8 caracteres por solicitud, coincidente con la cabecera HTTP `X-Request-Id`.
-- **`ruta`**: Método HTTP y ruta consultada (`METODO /ruta`).
-- **`errores`**: (Opcional) Arreglo de fallos detallados por campo `[{ campo, mensaje }]` en errores de validación 400.
+Si hay errores por campo se agrega `"errores": [ ... ]`. La cabecera `X-Request-Id` repite el `idTraza`.
+Un error inesperado responde `500` con `"mensaje": "Error interno del servidor"` y **nunca** expone datos internos.
 
-#### Códigos HTTP implementados:
-| Código | Tipo Semántico | Cuándo se devuelve | Ejemplo en Repuestos / Encuestas |
+| Código | `tipo` | Cuándo |
+|---|---|---|
+| 200 | — | Consulta o actualización correcta |
+| 201 | — | Registro creado |
+| 204 | — | Baja lógica correcta (sin cuerpo) |
+| 400 | `VALIDACION` | Campos faltantes o inválidos (trae `errores`) |
+| 400 | `SOLICITUD_INVALIDA` | Id no numérico, o regla de negocio que impide la operación |
+| 404 | `NO_ENCONTRADO` | El registro o la ruta no existen |
+| 409 | `CONFLICTO` | Valor único repetido |
+| 500 | `ERROR_INTERNO` | Error inesperado |
+
+### 8.2 Repuestos · `/api/repuestos`
+
+Piezas de repuesto y su stock. El `DELETE` es **borrado lógico**: la fila se conserva con `activo = false`.
+
+| Método | Ruta | Parámetros | Cuerpo | Éxito | Errores |
+|---|---|---|---|---|---|
+| GET | `/api/repuestos` | `modelo_compatible`, `bajo_stock=true`, `incluir_inactivos=true` (opcionales) | — | 200 lista | — |
+| GET | `/api/repuestos/:id` | `id` entero positivo | — | 200 objeto | 400 id inválido · 404 |
+| POST | `/api/repuestos` | — | ver abajo | 201 objeto | 400 `VALIDACION` · 409 código repetido |
+| PUT | `/api/repuestos/:id` | `id` | cualquier campo de la tabla | 200 objeto | 400 · 404 · 409 |
+| DELETE | `/api/repuestos/:id` | `id` | — | 204 | 400 con stock · 404 |
+
+**Cuerpo de `POST`:**
+
+| Campo | Tipo | Obligatorio | Regla |
 |---|---|---|---|
-| **400** | `VALIDACION` / `SOLICITUD_INVALIDA` | Datos mal formados, campos obligatorios faltantes, tipos/rangos inválidos, orden no entregada o baja de repuesto con stock > 0 | `POST /api/repuestos` con precio < 0; `POST /api/encuestas` para orden en estado "en_proceso"; `DELETE /api/repuestos/1` con stock disponible |
-| **401** | `NO_AUTENTICADO` | Falta de credenciales de acceso o inválidas | `GET /api/admin/resumen` sin cabecera `x-api-key` |
-| **403** | `SIN_PERMISO` | Credenciales válidas pero rol insuficiente | Acceso denegado por rol no autorizado |
-| **404** | `NO_ENCONTRADO` | Ruta no existente en el servidor o recurso no encontrado en la base de datos | `GET /api/repuestos/999`; `DELETE /api/encuestas/999`; `GET /api/vehiculo` (ruta inexistente) |
-| **409** | `CONFLICTO` | Datos sintácticamente válidos pero en choque con el estado del sistema | `POST /api/repuestos` con código duplicado (incluso dado de baja); `POST /api/encuestas` para orden que ya tiene encuesta |
-| **413** | `CUERPO_MUY_GRANDE` | Carga útil del cuerpo excede el límite de seguridad (10 KB) | Solicitud POST con cuerpo superior a 10 KB |
-| **500** | `ERROR_INTERNO` | Excepción imprevista del servidor (base de datos caída, error de ejecución) | Falla no controlada; no expone stacks ni credenciales al cliente y se registra en log con su `idTraza` |
+| `codigo` | texto | sí | mínimo 3 caracteres; se guarda en mayúsculas; único |
+| `nombre` | texto | sí | no vacío |
+| `modelo_compatible` | texto | sí | uno de: `Mazda2`, `Mazda3`, `CX-3`, `CX-30`, `CX-5`, `CX-50`, `CX-90`, `BT-50`, `MX-5`, `Todos` |
+| `precio` | número | sí | mayor a 0 |
+| `stock` | entero | no (0) | mayor o igual a 0 |
+| `stock_minimo` | entero | no (5) | mayor o igual a 0 |
+| `ubicacion` | texto | no | — |
 
-La bandera de baja (`activo` / `activa`) **no se envía** en `POST` ni `PUT`: solo cambia con `DELETE`.
+`activo` **no se puede enviar**: la baja solo se hace con `DELETE`.
 
-**Pruebas:** importar `postman/kodo-motor-backend.postman_collection.json` en Postman
-(*Import → files*) y ejecutar la colección completa (*Run collection*) con la base recién creada.
-Cada carpeta tiene casos positivos y negativos con su prueba automática del código HTTP.
+#### Ejemplos
 
-## 9. Base de datos
+**GET `/api/repuestos/1` → 200**
 
-- **Motor:** MySQL 8.4 en Docker. Se publica en `localhost:3307` para no chocar con un MySQL instalado.
-- **Creación automática:** al primer `docker compose up -d`, el contenedor ejecuta `database/01_schema.sql`
-  y `database/02_seed.sql` en ese orden.
-- **Volver a crearla desde cero** (borra los datos de prueba): `npm run bd:reiniciar`.
-  Es necesario si se cambia un `.sql`, porque los scripts solo corren con el volumen vacío.
-- **Ver los datos:** Adminer en `http://localhost:8081` (servidor `mysql`, usuario y contraseña
-  los de `DB_USER` y `DB_PASSWORD` del `.env`) o MySQL Workbench en `localhost:3307`.
-- **Columnas del borrado lógico:** `sedes.activa`, y `activo` en `servicios`, `catalogo`, `reservas`,
-  `repuestos` y `encuestas`. Evidencia: después de un `DELETE`, `SELECT * FROM <tabla> WHERE id = ...`
-  sigue mostrando la fila, con la bandera en 0.
-
-**Sin Docker (MySQL instalado):** ejecutar `01_schema.sql` y `02_seed.sql` en Workbench y crear
-el usuario de la API con los valores que se pondrán en el `.env`:
-
-```sql
-CREATE USER 'usuario_de_la_api'@'localhost' IDENTIFIED BY 'contraseña_que_elijas';
-GRANT ALL PRIVILEGES ON kodo_db.* TO 'usuario_de_la_api'@'localhost';
+```json
+{ "id": 1, "codigo": "FIL-001", "nombre": "Filtro de aceite", "modeloCompatible": "Mazda3",
+  "stock": 0, "stockMinimo": 5, "precio": 25.5, "ubicacion": "A-1", "activo": true,
+  "alertaBajoStock": true }
 ```
 
-En ese caso, en el `.env`: `DB_PORT=3306` (o el puerto de tu MySQL).
+> **Importante:** el cuerpo que se **envía** usa `modelo_compatible` y `stock_minimo` (snake_case), pero la
+> respuesta devuelve `modeloCompatible` y `stockMinimo` (camelCase) y agrega `alertaBajoStock`
+> (`true` cuando `stock` es menor o igual a `stockMinimo`).
 
-## 10. Observaciones y problemas resueltos durante la integración
+**POST `/api/repuestos` → 201**
 
-### Al fusionar los tres repositorios
+```json
+// cuerpo enviado
+{ "codigo": "FIL-002", "nombre": "Filtro de aire", "modelo_compatible": "CX-5", "stock": 10, "precio": 40 }
+// respuesta
+{ "id": 2, "codigo": "FIL-002", "nombre": "Filtro de aire", "modeloCompatible": "CX-5",
+  "stock": 10, "stockMinimo": 5, "precio": 40, "ubicacion": null, "activo": true,
+  "alertaBajoStock": false }
+```
 
-| Problema | Causa | Solución |
+**POST con cuerpo vacío → 400 `VALIDACION`**
+
+```json
+{ "estado": 400, "tipo": "VALIDACION", "mensaje": "Datos de repuesto inválidos",
+  "idTraza": "75d8c1e2", "ruta": "POST /api/repuestos",
+  "errores": [
+    "El campo \"codigo\" es obligatorio y debe tener al menos 3 caracteres",
+    "El campo \"nombre\" es obligatorio y no puede estar vacío",
+    "El campo \"modelo_compatible\" debe ser uno de: Mazda2, Mazda3, CX-3, CX-30, CX-5, CX-50, CX-90, BT-50, MX-5, Todos",
+    "El campo \"precio\" es obligatorio y debe ser un número mayor a 0"
+  ] }
+```
+
+**POST con código repetido → 409**
+
+```json
+{ "estado": 409, "tipo": "CONFLICTO",
+  "mensaje": "Ya existe un repuesto registrado con el código \"FIL-001\"",
+  "idTraza": "e3cdb4a4", "ruta": "POST /api/repuestos" }
+```
+
+**GET `/api/repuestos/abc` → 400 `SOLICITUD_INVALIDA`**
+
+```json
+{ "estado": 400, "tipo": "SOLICITUD_INVALIDA", "mensaje": "El id debe ser un número entero positivo",
+  "idTraza": "24e8a900", "ruta": "GET /api/repuestos/abc" }
+```
+
+**DELETE `/api/repuestos/1` → 204** (sin cuerpo).
+**Regla de negocio:** si el repuesto todavía tiene `stock` mayor a 0, responde **400** y no lo da de baja.
+
+### 8.3 Encuestas · `/api/encuestas`
+
+Encuesta de satisfacción de una orden de servicio. Una orden solo admite **una** encuesta y debe estar **entregada**.
+El `DELETE` es borrado lógico.
+
+| Método | Ruta | Parámetros | Cuerpo | Éxito | Errores |
+|---|---|---|---|---|---|
+| GET | `/api/encuestas` | `puntuacion`, `recomendaria`, `incluir_inactivos=true` (opcionales) | — | 200 lista | — |
+| GET | `/api/encuestas/:id` | `id` entero positivo | — | 200 objeto | 400 · 404 |
+| POST | `/api/encuestas` | — | ver abajo | 201 objeto | 400 · 404 orden · 409 |
+| PUT | `/api/encuestas/:id` | `id` | `puntuacion`, `recomendaria`, `comentario` | 200 objeto | 400 · 404 |
+| DELETE | `/api/encuestas/:id` | `id` | — | 204 | 404 |
+
+**Cuerpo de `POST`:**
+
+| Campo | Tipo | Obligatorio | Regla |
+|---|---|---|---|
+| `orden_id` | entero | sí | positivo; la orden debe existir y estar en estado `entregado` |
+| `puntuacion` | entero | sí | de 1 a 5 |
+| `recomendaria` | booleano | sí | `true/false` o `1/0` |
+| `comentario` | texto | no | máximo 300 caracteres |
+
+#### Ejemplos
+
+**POST `/api/encuestas` → 201**
+
+```json
+// cuerpo enviado
+{ "orden_id": 10, "puntuacion": 4, "recomendaria": true, "comentario": "Buen servicio" }
+// respuesta
+{ "id": 2, "ordenId": 10, "puntuacion": 4, "recomendaria": true, "comentario": "Buen servicio",
+  "createdAt": "2026-11-16T19:40:00.000Z", "activo": true }
+```
+
+> **Importante:** se envía `orden_id` (snake_case) y la respuesta devuelve `ordenId` (camelCase) y `createdAt`.
+
+**POST con puntuación 9 → 400 `VALIDACION`**
+
+```json
+{ "estado": 400, "tipo": "VALIDACION", "mensaje": "Datos de encuesta inválidos",
+  "idTraza": "562f31da", "ruta": "POST /api/encuestas",
+  "errores": ["El campo \"puntuacion\" es obligatorio y debe ser un número entero entre 1 y 5"] }
+```
+
+**POST con una orden que no existe → 404**
+
+```json
+{ "estado": 404, "tipo": "NO_ENCONTRADO",
+  "mensaje": "No se puede registrar la encuesta: La orden de servicio #99 no existe",
+  "idTraza": "6cd6e6e6", "ruta": "POST /api/encuestas" }
+```
+
+**POST con una orden que no está entregada → 400 `SOLICITUD_INVALIDA`**
+
+```json
+{ "estado": 400, "tipo": "SOLICITUD_INVALIDA",
+  "mensaje": "No se puede encuestar la orden #12 porque su estado es \"en proceso\". Solo se admiten encuestas para órdenes con estado \"entregado\".",
+  "idTraza": "4cc87ee0", "ruta": "POST /api/encuestas" }
+```
+
+**POST con una orden que ya tiene encuesta → 409**
+
+```json
+{ "estado": 409, "tipo": "CONFLICTO",
+  "mensaje": "La orden de servicio #11 ya cuenta con una encuesta de satisfacción registrada (ID: 1)",
+  "idTraza": "74a69c5a", "ruta": "POST /api/encuestas" }
+```
+
+**GET `/api/encuestas/999` → 404**
+
+```json
+{ "estado": 404, "tipo": "NO_ENCONTRADO", "mensaje": "Encuesta con ID 999 no encontrada",
+  "idTraza": "da02e41d", "ruta": "GET /api/encuestas/999" }
+```
+
+**Ruta inexistente (`GET /api/no-existe`) → 404, en JSON y no en HTML**
+
+```json
+{ "estado": 404, "tipo": "NO_ENCONTRADO", "mensaje": "Ruta no encontrada: GET /api/no-existe",
+  "idTraza": "eab5b445", "ruta": "GET /api/no-existe" }
+```
+
+## 9. Pruebas
+
+| Tipo | Cómo se ejecuta | Estado |
 |---|---|---|
-| Dos rutas `GET /api/sedes` y `GET /api/servicios` | u2 las tenía como consulta de apoyo y E03 como CRUD completo | Se dejó el CRUD de E03; de los lookups de u2 quedó solo `GET /api/vehiculos` |
-| Tres formatos de respuesta y de error | `{ ok, datos }` en E03, `{ error }` en u2 y Grupo1-4 | Un solo contrato: JSON plano en éxitos, `{ mensaje, errores }` en errores, un `HttpError` y un manejador central |
-| Dos repositorios borraban registros de verdad | `DELETE FROM` en sedes, servicios, catálogo y reservas | Borrado lógico en los seis recursos; columna `activo` nueva en `catalogo` y `reservas` |
-| Una baja se podía revertir con `PUT` | En E03, `activa`/`activo` eran campos editables | La bandera salió de los campos permitidos; solo cambia con `DELETE` |
-| Express 4 en Grupo1-4 y Express 5 en los demás | Cada equipo instaló una versión | Todo el proyecto en Express 5; las rutas de Grupo1-4 no necesitaron cambios |
-| Choques al unir los historiales | Los tres repos tenían `README.md`, `package.json`, `db.js`, `.env.example`… | `git merge --allow-unrelated-histories` resolviendo cada archivo; se conservan los commits de todos |
-| Contraseña de clase en `.env.example`, `db.js` y `docker-compose.yml` | Valores por defecto para que funcionara sin configurar | `.env.example` solo con texto descriptivo; `docker-compose.yml` exige cada variable con `${VAR:?}` |
-| El trigger de encuestas se creaba con `latin1` | `01_schema.sql` no tenía `SET NAMES utf8mb4` | Se agregó al inicio del esquema; además `.gitattributes` fuerza fin de línea LF en los `.sql` |
-| Contenedor `kodo_mysql` ya en uso | Los repos anteriores usaban el mismo nombre de contenedor | Detener el contenedor del repo anterior (`docker compose down` en su carpeta) antes de levantar este |
+| Automáticas (`test-suite.js`) | `npm test` | Disponible |
+| Manuales con Postman | Importar `postman/kodo-motor-backend.postman_collection.json` y ejecutar *Run collection* | Disponible |
+| Reporte de pruebas QAS de Repuestos y Encuestas | Documento del equipo con petición, resultado esperado, resultado obtenido y evidencia | En elaboración |
 
-### Durante el desarrollo de los módulos
+## 10. Incidencias detectadas
 
-| Problema | Causa | Solución |
+| Incidencia | Causa | Mejora aplicada o pendiente |
 |---|---|---|
-| Conflicto de merge en `src/routes/index.js` | Dos integrantes agregaron sus rutas en las mismas líneas del archivo | Se conservaron las rutas de ambos, se quitaron las marcas `<<<<<<<`, `=======` y `>>>>>>>` y se completó el merge |
-| Conflicto de merge en `.gitignore` | Dos integrantes editaron el archivo en ramas distintas | Se resolvió en Visual Studio Code conservando las reglas de las dos ramas |
-| Trabajo subido a una rama distinta de la acordada | Un integrante subió su parte a `feature/errores-y-docs` | Se integró a `main` con `git merge` |
-| Una rama no permitía abrir un pull request | `feature/encuestas-qa-docs` se subió desde un clon anterior y no tenía historial común con `main` | Se creó la rama desde `origin/main` actualizado, sin `push --force` |
-| El precio llegaba como texto (`"380.00"`) | mysql2 devuelve las columnas `DECIMAL` como texto | `decimalNumbers: true` en el pool de `db.js` |
-| Las banderas llegaban como `1` y `0` | MySQL guarda `TINYINT(1)` como número | `typeCast` en `db.js` que las convierte en `true` y `false` |
-| El teléfono perdía el 0 inicial | Enviado como número, `014567890` se vuelve `14567890` | El teléfono se exige como texto de 9 dígitos |
-| Un `stock_minimo` de 0 se guardaba como 5 | `Number(stock_minimo) \|\| 5` trata el 0 como falso | Se cambió por `Number(stock_minimo ?? 5)`, que usa 5 solo si el campo no llega |
-| Un JSON mal formado devolvía una página HTML con rutas del disco | Express no tenía un manejador de errores de 4 parámetros | Middleware de errores que responde `400` en JSON |
-| Las tildes del seed se guardaban mal (`AtenciÃ³n`) | El contenedor ejecutaba los `.sql` con `latin1` | `SET NAMES utf8mb4;` al inicio de los scripts SQL |
-| Reservas y catálogo respondían los errores con formatos distintos | Cada módulo tenía su propia clase de error | Se unificaron en una sola clase y un manejador central |
-| Cada PC usaba un puerto de MySQL distinto | Docker publica el 3307, MySQL instalado usa el 3306 y XAMPP otro | El puerto se configura en `.env`, sin tocar código |
-| Riesgo de subir las claves de la base de datos | El `.env` tiene usuario y contraseña | `.env` está en `.gitignore`; solo se sube `.env.example` |
-
-### Trabajo colaborativo en GitHub
-
-- `main` contiene los commits de los tres repositorios originales unidos por merge, no copiados.
-  `git shortlog -sne` muestra a cada autor (`.mailmap` agrupa a quienes usaron dos correos).
-- Las ramas que no llegaron a `main` en sus repos originales se conservan como
-  `historial/u2/archivo-reservas`, `historial/u2/jeff` y `historial/g14/feature/encuestas-qa-docs`.
-- Cada paso de la fusión es un commit aparte con el formato `[TAG] módulo: descripción`.
+| Las respuestas devuelven `modeloCompatible`, `stockMinimo` y `ordenId` (camelCase), pero el cuerpo que se envía usa `modelo_compatible`, `stock_minimo` y `orden_id` (snake_case) | Los modelos exponen sus propiedades en camelCase al serializar | Documentado en la sección 8 para que el cliente no se confunda |
+| La rama de trabajo partía de una versión anterior a la semana 10: sin `idTraza`, `AppError` ni `asyncHandler`, y con errores de la forma `{ "mensaje": ... }` | La rama se creó antes de integrar la capa de errores | Pendiente: integrar la capa de errores de la semana 10 y comprobar un `GET` real |
+| No se podía dar de baja un repuesto con stock | Regla de negocio de almacén | Documentada: responde 400 mientras `stock` sea mayor a 0 |

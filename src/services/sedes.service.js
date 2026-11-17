@@ -1,8 +1,13 @@
-// Servicio de sedes: reglas de negocio; no conoce req/res ni SQL
+// Servicio de sedes: reglas de negocio según Semana 10 (Slides 23, 24, 34)
+// Lanza errores tipados (NotFoundError, ConflictError, BadRequestError)
 const repositorio = require('../repositories/sedes.repository');
 const repositorioReservas = require('../repositories/reserva.repository');
 const modelo = require('../models/sede.model');
-const HttpError = require('../utils/http-error');
+const {
+  NotFoundError,
+  ConflictError,
+  BadRequestError,
+} = require('../middlewares/errors/AppError');
 const { hoyISO } = require('../validators/common');
 
 async function listarSedes(filtros = {}) {
@@ -13,19 +18,19 @@ async function listarSedes(filtros = {}) {
 async function buscarSedePorId(id) {
   const sede = await repositorio.buscarPorId(id);
   if (!sede) {
-    throw new HttpError(404, `No existe una sede con id ${id}`);
+    throw new NotFoundError(`No existe una sede con id ${id}`);
   }
   return sede;
 }
 
-// El nombre es único también frente a las sedes dadas de baja
+// El nombre es único también frente a las sedes dadas de baja (Slide 15, 24)
 async function verificarNombreLibre(nombre, idActual = null) {
   const otra = await repositorio.buscarPorNombre(nombre);
   if (!otra || otra.id === idActual) return;
   if (otra.activa) {
-    throw new HttpError(409, `Ya existe una sede con el nombre "${nombre}"`);
+    throw new ConflictError(`Ya existe una sede con el nombre "${nombre}"`);
   }
-  throw new HttpError(409, `El nombre "${nombre}" pertenece a una sede dada de baja (id ${otra.id})`);
+  throw new ConflictError(`El nombre "${nombre}" pertenece a una sede dada de baja (id ${otra.id})`);
 }
 
 async function crearSede(datos) {
@@ -40,7 +45,7 @@ async function crearSede(datos) {
 async function actualizarSede(id, cambios) {
   modelo.revisarCampos(cambios);
   if (Object.keys(cambios).length === 0) {
-    throw new HttpError(400, 'Envía al menos un campo para actualizar');
+    throw new BadRequestError('Envía al menos un campo para actualizar');
   }
 
   const sedeActual = await buscarSedePorId(id);
@@ -56,12 +61,12 @@ async function actualizarSede(id, cambios) {
 async function eliminarSede(id) {
   const citasPendientes = await repositorioReservas.contarCitasPendientesDeSede(id, hoyISO());
   if (citasPendientes > 0) {
-    throw new HttpError(409, `No se puede dar de baja la sede: tiene citas generadas pendientes (${citasPendientes})`);
+    throw new ConflictError(`No se puede dar de baja la sede: tiene citas generadas pendientes (${citasPendientes})`);
   }
 
   const eliminada = await repositorio.eliminar(id);
   if (!eliminada) {
-    throw new HttpError(404, `No existe una sede con id ${id}`);
+    throw new NotFoundError(`No existe una sede con id ${id}`);
   }
 }
 
