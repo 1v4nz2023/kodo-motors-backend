@@ -7,6 +7,12 @@ const { probarConexion } = require('./config/db');
 const puerto = Number(process.env.PORT) || 4000;
 
 async function iniciarServidor() {
+  // Sin llave configurada, sedes y servicios rechazarían todo: mejor avisar al arrancar
+  if (!process.env.API_KEY) {
+    console.error('✘ Falta API_KEY en el .env. Copia la variable desde .env.example y ponle un valor propio');
+    process.exit(1);
+  }
+
   try {
     const infoBase = await probarConexion();
     console.log(`✔ Conectado a MySQL ${infoBase.version} · base de datos: ${infoBase.base}`);
