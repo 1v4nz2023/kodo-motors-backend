@@ -6,8 +6,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node test-suite.js",
-    "test:postman": "npx newman run postman/kodo-motors-manejo-errores.postman_collection.json",
+    "test": "jest --runInBand",
+    "test:legacy": "node test-suite.js",
+    "test:unit": "jest --runInBand tests/unit",
+    "test:functional": "jest --runInBand tests/functional",
+    "test:watch": "jest --watch",
+    "coverage": "jest --runInBand --coverage",
     "bd:levantar": "docker compose up -d",
     "bd:detener": "docker compose down",
     "bd:reiniciar": "docker compose down -v && docker compose up -d"
@@ -33,6 +37,8 @@
     "mysql2": "~3.24.6"
   },
   "devDependencies": {
-    "nodemon": "~3.1.14"
+    "jest": "^30.5.2",
+    "nodemon": "~3.1.14",
+    "supertest": "^7.3.2"
   }
 }
