@@ -33,7 +33,7 @@ vehículos, servicio de taller y venta de repuestos.
 | Lenin David Mamani Sarmiento | Semana 11 · pruebas |
 | Sharmili Luzmer Soncco Lupa | Documentación |
 | Geraldo Fair Jaramillo Florida (líder técnico) | Documentación · revisión y merge |
-| Rodrigo Alonso | Por definir |
+| Rodrigo Alonso | Documentación QA (reporte de pruebas) |
 
 ## 3. Tecnologías
 
