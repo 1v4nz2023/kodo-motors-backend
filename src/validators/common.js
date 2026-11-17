@@ -1,5 +1,6 @@
 // Piezas reutilizables entre validadores.
 const { body, param } = require('express-validator');
+const { BadRequestError, ValidationError } = require('../middlewares/errors/AppError');
 
 const FORMATO_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ENTERO_MAXIMO = 2147483647; // límite de una columna INT
@@ -79,7 +80,22 @@ const enteroPositivo = (nombre, parcial = false) =>
     .isInt({ min: 1, max: ENTERO_MAXIMO }).withMessage(`${nombre} debe ser un entero positivo`)
     .toInt();
 
+// Rechaza los campos que el recurso no conoce, con un error por campo (mismo contrato que validar).
+// Va después de validar: así los mensajes específicos (id, activa) salen primero.
+const soloCamposPermitidos = (permitidos) => (req, res, next) => {
+  const cuerpo = req.body;
+  if (!cuerpo || typeof cuerpo !== 'object' || Array.isArray(cuerpo)) {
+    return next(new BadRequestError('El cuerpo de la solicitud debe ser un objeto JSON'));
+  }
+  const desconocidos = Object.keys(cuerpo).filter((nombre) => !permitidos.includes(nombre));
+  if (desconocidos.length === 0) return next();
+  return next(new ValidationError(
+    desconocidos.map((nombre) => ({ campo: nombre, mensaje: `${nombre} no es un campo permitido` })),
+  ));
+};
+
 module.exports = {
+  soloCamposPermitidos,
   idParam, campo, existeEn, idRelacion, hoyISO, fechaISO, horaHHMM,
   textoObligatorio, textoOpcional, enteroPositivo, esTextoONumero, ENTERO_MAXIMO, FORMATO_HORA,
 };

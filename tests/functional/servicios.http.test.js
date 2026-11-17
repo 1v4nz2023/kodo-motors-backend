@@ -1,3 +1,7 @@
+// Las rutas de servicios exigen x-api-key (todas) y rol admin (escritura): se envían en cada petición
+process.env.API_KEY = 'llave-de-prueba';
+const CABECERAS = { 'x-api-key': 'llave-de-prueba', 'x-rol': 'admin' };
+
 jest.mock('../../src/repositories/servicios.repository');
 jest.mock('../../src/repositories/reserva.repository');
 
@@ -26,7 +30,7 @@ describe('API de servicios', () => {
     repositorio.crear.mockResolvedValue(9);
     repositorio.buscarPorId.mockResolvedValue({ id: 9, ...datos, activo: true });
 
-    const respuesta = await request(app).post('/api/servicios').send(datos);
+    const respuesta = await request(app).post('/api/servicios').set(CABECERAS).send(datos);
 
     expect(respuesta.status).toBe(201);
     expect(respuesta.body).toMatchObject({ id: 9, duracion_min });
@@ -35,6 +39,7 @@ describe('API de servicios', () => {
   test.each([14, 481])('POST rechaza la duración fuera del límite %i', async (duracion_min) => {
     const respuesta = await request(app)
       .post('/api/servicios')
+      .set(CABECERAS)
       .send({ ...datosValidos, duracion_min });
 
     esperarError(respuesta, 400);
@@ -47,7 +52,7 @@ describe('API de servicios', () => {
   test('POST responde 409 cuando el nombre ya existe', async () => {
     repositorio.buscarPorNombre.mockResolvedValue({ id: 2, activo: true });
 
-    const respuesta = await request(app).post('/api/servicios').send(datosValidos);
+    const respuesta = await request(app).post('/api/servicios').set(CABECERAS).send(datosValidos);
 
     esperarError(respuesta, 409);
     expect(repositorio.crear).not.toHaveBeenCalled();
@@ -56,13 +61,13 @@ describe('API de servicios', () => {
   test('GET por id responde 404 cuando no existe', async () => {
     repositorio.buscarPorId.mockResolvedValue(undefined);
 
-    const respuesta = await request(app).get('/api/servicios/999');
+    const respuesta = await request(app).get('/api/servicios/999').set(CABECERAS);
 
     esperarError(respuesta, 404);
   });
 
   test('PUT rechaza un cuerpo vacío', async () => {
-    const respuesta = await request(app).put('/api/servicios/2').send({});
+    const respuesta = await request(app).put('/api/servicios/2').set(CABECERAS).send({});
 
     esperarError(respuesta, 400);
     expect(repositorio.actualizar).not.toHaveBeenCalled();
@@ -71,7 +76,7 @@ describe('API de servicios', () => {
   test('DELETE responde 409 cuando existen citas pendientes', async () => {
     repositorioReservas.contarCitasPendientesDeServicio.mockResolvedValue(1);
 
-    const respuesta = await request(app).delete('/api/servicios/2');
+    const respuesta = await request(app).delete('/api/servicios/2').set(CABECERAS);
 
     esperarError(respuesta, 409);
     expect(repositorio.eliminar).not.toHaveBeenCalled();
@@ -81,7 +86,7 @@ describe('API de servicios', () => {
     repositorioReservas.contarCitasPendientesDeServicio.mockResolvedValue(0);
     repositorio.eliminar.mockResolvedValue(true);
 
-    const respuesta = await request(app).delete('/api/servicios/2');
+    const respuesta = await request(app).delete('/api/servicios/2').set(CABECERAS);
 
     expect(respuesta.status).toBe(204);
     expect(respuesta.text).toBe('');

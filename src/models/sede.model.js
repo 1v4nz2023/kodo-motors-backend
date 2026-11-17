@@ -1,4 +1,5 @@
 // Modelo: reglas de validación de una sede. La baja se hace solo con DELETE (borrado lógico)
+// Cada error sale como { campo, mensaje }: el mismo formato que usan los validadores de ruta
 const { ValidationError, BadRequestError } = require('../middlewares/errors/AppError');
 const {
   esTextoValido,
@@ -34,17 +35,17 @@ function validarSede(datos) {
   const errores = [];
 
   if (!esTextoValido(datos.nombre, 80)) {
-    errores.push('nombre es obligatorio y debe tener máximo 80 caracteres');
+    errores.push({ campo: 'nombre', mensaje: 'nombre es obligatorio y debe tener máximo 80 caracteres' });
   }
   if (!esTextoValido(datos.distrito, 60)) {
-    errores.push('distrito es obligatorio y debe tener máximo 60 caracteres');
+    errores.push({ campo: 'distrito', mensaje: 'distrito es obligatorio y debe tener máximo 60 caracteres' });
   }
   if (!esTextoValido(datos.direccion, 150)) {
-    errores.push('direccion es obligatoria y debe tener máximo 150 caracteres');
+    errores.push({ campo: 'direccion', mensaje: 'direccion es obligatoria y debe tener máximo 150 caracteres' });
   }
 
   if (typeof datos.telefono !== 'string' || !FORMATO_TELEFONO.test(datos.telefono)) {
-    errores.push('telefono debe ser texto de 9 dígitos, por ejemplo "014445566"');
+    errores.push({ campo: 'telefono', mensaje: 'telefono debe ser texto de 9 dígitos, por ejemplo "014445566"' });
   }
 
   const horaAperturaValida =
@@ -52,18 +53,24 @@ function validarSede(datos) {
   const horaCierreValida =
     typeof datos.hora_cierre === 'string' && FORMATO_HORA.test(datos.hora_cierre);
 
-  if (!horaAperturaValida) errores.push('hora_apertura debe tener formato HH:MM, por ejemplo "08:00"');
-  if (!horaCierreValida) errores.push('hora_cierre debe tener formato HH:MM, por ejemplo "18:00"');
+  if (!horaAperturaValida) {
+    errores.push({ campo: 'hora_apertura', mensaje: 'hora_apertura debe tener formato HH:MM, por ejemplo "08:00"' });
+  }
+  if (!horaCierreValida) {
+    errores.push({ campo: 'hora_cierre', mensaje: 'hora_cierre debe tener formato HH:MM, por ejemplo "18:00"' });
+  }
 
   if (horaAperturaValida && horaCierreValida) {
     if (completarHora(datos.hora_apertura) >= completarHora(datos.hora_cierre)) {
-      errores.push('hora_apertura debe ser menor que hora_cierre');
+      errores.push({ campo: 'hora_apertura', mensaje: 'hora_apertura debe ser menor que hora_cierre' });
     }
   }
 
   const atiendeDomingo =
     datos.atiende_domingo === undefined ? false : convertirBooleano(datos.atiende_domingo);
-  if (atiendeDomingo === null) errores.push('atiende_domingo debe ser true o false');
+  if (atiendeDomingo === null) {
+    errores.push({ campo: 'atiende_domingo', mensaje: 'atiende_domingo debe ser true o false' });
+  }
 
   if (errores.length > 0) {
     throw new ValidationError(errores, 'Datos de la sede no válidos');
