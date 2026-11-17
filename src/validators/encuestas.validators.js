@@ -27,7 +27,10 @@ const reglasEncuesta = (parcial = false) => [
       ]
     : []),
 
-  enteroPositivo('orden_id', parcial),
+  // La orden de una encuesta no se cambia: en PUT se rechaza; en POST es obligatoria.
+  ...(parcial
+    ? [body('orden_id').not().exists().withMessage('El orden_id no se puede modificar')]
+    : [enteroPositivo('orden_id', false)]),
 
   campo('puntuacion', parcial)
     .notEmpty().withMessage('La puntuación es obligatoria').bail()
@@ -55,4 +58,11 @@ const reglasFiltrosEncuesta = () => [
     .isIn(['true', 'false', '1', '0']).withMessage('El filtro recomendaria debe ser true, false, 1 o 0'),
 ];
 
-module.exports = { reglasEncuesta, reglasFiltrosEncuesta };
+// Alias con los nombres de la semana 10: el comportamiento es el mismo.
+module.exports = {
+  reglasEncuesta,
+  reglasFiltrosEncuesta,
+  reglasCrearEncuesta: () => reglasEncuesta(false),
+  reglasActualizarEncuesta: () => reglasEncuesta(true),
+  reglasFiltrosEncuestas: reglasFiltrosEncuesta,
+};

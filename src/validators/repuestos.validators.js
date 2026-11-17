@@ -81,4 +81,4 @@ const reglasFiltrosRepuesto = () => [
     .isIn(['true', 'false', '1', '0']).withMessage('bajo_stock debe ser true, false, 1 o 0'),
 ];
 
-module.exports = { reglasRepuesto, reglasFiltrosRepuesto };
+module.exports = { reglasRepuesto, reglasFiltrosRepuesto, reglasFiltrosRepuestos: reglasFiltrosRepuesto };
