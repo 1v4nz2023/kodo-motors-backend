@@ -32,6 +32,10 @@
     {
       "key": "repuestoId",
       "value": ""
+    },
+    {
+      "key": "encuestaId",
+      "value": ""
     }
   ],
   "item": [
@@ -2399,6 +2403,51 @@
           }
         },
         {
+          "name": "Registrar válida para orden entregada (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Respeta puntuación límite 5', () => pm.expect(pm.response.json().puntuacion).to.eql(5));",
+                  "pm.collectionVariables.set('encuestaId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/encuestas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "encuestas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orden_id\": 2,\n  \"puntuacion\": 5,\n  \"recomendaria\": true,\n  \"comentario\": \"Excelente atención\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Caso positivo y valor límite superior de puntuación. La orden 2 está entregada y no tiene encuesta en los datos semilla."
+          }
+        },
+        {
           "name": "Registrar para una orden con encuesta (409)",
           "event": [
             {
@@ -2431,7 +2480,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"orden_id\": 1,\n  \"puntuacion\": 5,\n  \"recomendaria\": true\n}",
+              "raw": "{\n  \"orden_id\": 2,\n  \"puntuacion\": 5,\n  \"recomendaria\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2463,14 +2512,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/encuestas/1",
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "encuestas",
-                "1"
+                "{{encuestaId}}"
               ]
             },
             "body": {
@@ -2506,14 +2555,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/encuestas/1",
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "encuestas",
-                "1"
+                "{{encuestaId}}"
               ]
             },
             "body": {
@@ -2544,14 +2593,14 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/encuestas/1",
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "encuestas",
-                "1"
+                "{{encuestaId}}"
               ]
             },
             "description": "Borrado lógico: la fila queda con activo = 0."
@@ -2574,14 +2623,14 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/encuestas/1",
+              "raw": "{{baseUrl}}/api/encuestas/{{encuestaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "encuestas",
-                "1"
+                "{{encuestaId}}"
               ]
             }
           }

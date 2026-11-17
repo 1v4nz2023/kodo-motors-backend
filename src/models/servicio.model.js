@@ -20,6 +20,8 @@ const CATEGORIAS_PERMITIDAS = [
 const CAMPOS_PERMITIDOS = ['nombre', 'categoria', 'descripcion', 'precio', 'duracion_min'];
 
 const PRECIO_MAXIMO = 999999.99;
+const DURACION_MINIMA = 15;
+const DURACION_MAXIMA = 480;
 
 function revisarCampos(datos) {
   revisarCamposPermitidos(datos, CAMPOS_PERMITIDOS);
@@ -48,8 +50,13 @@ function validarServicio(datos) {
   }
 
   const duracionMinutos = convertirNumero(datos.duracion_min);
-  if (duracionMinutos === null || !Number.isInteger(duracionMinutos) || duracionMinutos <= 0) {
-    errores.push('duracion_min debe ser un número entero de minutos mayor que 0');
+  if (
+    duracionMinutos === null ||
+    !Number.isInteger(duracionMinutos) ||
+    duracionMinutos < DURACION_MINIMA ||
+    duracionMinutos > DURACION_MAXIMA
+  ) {
+    errores.push(`duracion_min debe ser un número entero entre ${DURACION_MINIMA} y ${DURACION_MAXIMA} minutos`);
   }
 
   if (errores.length > 0) {
@@ -86,6 +93,8 @@ module.exports = {
   CATEGORIAS_PERMITIDAS,
   CAMPOS_PERMITIDOS,
   PRECIO_MAXIMO,
+  DURACION_MINIMA,
+  DURACION_MAXIMA,
   revisarCampos,
   validarServicio,
   validarFiltros,
